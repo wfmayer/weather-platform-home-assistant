@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+python3 -m pip install --requirement requirements_common.txt
+python3 -m pip install --requirement requirements_dev.txt
+
+# Home Assistant installs some integration requirements into the Python user
+# site-packages directory at runtime. Ensure that directory exists before the
+# first Home Assistant process starts so Python includes it on sys.path.
+USER_SITE="$(python3 -c 'import site; print(site.getusersitepackages())')"
+mkdir -p "${USER_SITE}"
