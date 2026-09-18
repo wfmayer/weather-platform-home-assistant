@@ -22,9 +22,11 @@ if TYPE_CHECKING:
 
     from .api import (
         WeatherPlatformAirQualityData,
+        WeatherPlatformAlertsData,
         WeatherPlatformCurrentData,
         WeatherPlatformForecastData,
         WeatherPlatformMetadata,
+        WeatherPlatformRadarData,
     )
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,6 +39,8 @@ class WeatherPlatformData:
     current: WeatherPlatformCurrentData
     forecast: WeatherPlatformForecastData
     air_quality: WeatherPlatformAirQualityData | None
+    alerts: WeatherPlatformAlertsData | None
+    radar: WeatherPlatformRadarData | None
 
 
 class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatformData]):
@@ -82,23 +86,51 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
         except WeatherPlatformApiError as err:
             raise UpdateFailed from err
 
-        air_quality = await self._async_get_air_quality()
+        air_quality, alerts, radar = await asyncio.gather(
+            self._async_get_air_quality(),
+            self._async_get_alerts(),
+            self._async_get_radar(),
+        )
 
         return WeatherPlatformData(
             current=current,
             forecast=forecast,
             air_quality=air_quality,
+            alerts=alerts,
+            radar=radar,
         )
 
     async def _async_get_air_quality(
         self,
     ) -> WeatherPlatformAirQualityData | None:
-        """Fetch optional air-quality guidance without failing core weather."""
+        """Fetch optional air-quality guidance."""
         try:
             return await self.client.async_get_air_quality()
         except WeatherPlatformApiError:
             _LOGGER.debug(
                 "Weather Platform air-quality guidance is unavailable",
+                exc_info=True,
+            )
+            return None
+
+    async def _async_get_alerts(self) -> WeatherPlatformAlertsData | None:
+        """Fetch optional active-alert intelligence."""
+        try:
+            return await self.client.async_get_alerts()
+        except WeatherPlatformApiError:
+            _LOGGER.debug(
+                "Weather Platform active-alert intelligence is unavailable",
+                exc_info=True,
+            )
+            return None
+
+    async def _async_get_radar(self) -> WeatherPlatformRadarData | None:
+        """Fetch optional radar intelligence."""
+        try:
+            return await self.client.async_get_radar(self.unit_system)
+        except WeatherPlatformApiError:
+            _LOGGER.debug(
+                "Weather Platform radar intelligence is unavailable",
                 exc_info=True,
             )
             return None

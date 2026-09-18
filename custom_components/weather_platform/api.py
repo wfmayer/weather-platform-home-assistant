@@ -157,6 +157,78 @@ class WeatherPlatformAirQualityData:
     peak_next_24_hours: WeatherPlatformAirQualityPeriod | None
 
 
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformAlert:
+    """One active Weather Platform alert."""
+
+    event: str | None
+    headline: str | None
+    severity: str | None
+    level: str | None
+    critical: bool
+    expires_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformAlertsData:
+    """Active alerts reported by Weather Platform."""
+
+    generated_at: str
+    active_count: int
+    critical_count: int
+    highest_level: str | None
+    alerts: tuple[WeatherPlatformAlert, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformRadarLightning:
+    """Lightning intelligence reported by Weather Platform."""
+
+    available: bool
+    fetched_at: str | None
+    strike_count: int
+    recent_window_strike_count: int
+    strike_rate_per_minute: float | None
+    recent_strike_rate_per_minute: float | None
+    nearest_distance: float | None
+    distance_shift: float | None
+    activity_trend: str | None
+    rate_trend: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformRadarStorm:
+    """Tracked storm object reported by Weather Platform."""
+
+    storm_id: str | None
+    intensity: str | None
+    lifecycle_stage: str | None
+    distance: float | None
+    peak_reflectivity_dbz: float | None
+    approaching_home: bool
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformRadarStormTracking:
+    """Storm-tracking intelligence reported by Weather Platform."""
+
+    available: bool
+    status: str | None
+    valid_at: str | None
+    tracked_object_count: int
+    storms: tuple[WeatherPlatformRadarStorm, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformRadarData:
+    """Radar intelligence reported by Weather Platform."""
+
+    generated_at: str
+    unit_system: str
+    lightning: WeatherPlatformRadarLightning
+    storm_tracking: WeatherPlatformRadarStormTracking
+
+
 def normalize_base_url(value: str) -> str:
     """Normalize a Weather Platform application base URL."""
     candidate = value.strip()
@@ -344,6 +416,43 @@ class WeatherPlatformApiClient:
             ),
         )
 
+    async def async_get_alerts(self) -> WeatherPlatformAlertsData:
+        """Fetch active Weather Platform alerts."""
+        payload = await self._async_get_json("alerts")
+
+        return WeatherPlatformAlertsData(
+            generated_at=_required_str(payload, "generatedAt"),
+            active_count=_required_int(payload, "activeCount"),
+            critical_count=_required_int(payload, "criticalCount"),
+            highest_level=_optional_str(payload, "highestLevel"),
+            alerts=tuple(
+                _parse_alert(item) for item in _as_list(payload.get("alerts"))
+            ),
+        )
+
+    async def async_get_radar(
+        self,
+        unit_system: str,
+    ) -> WeatherPlatformRadarData:
+        """Fetch Weather Platform radar intelligence."""
+        payload = await self._async_get_json(
+            "radar",
+            params={"units": unit_system},
+        )
+
+        response_unit_system = _required_str(payload, "unitSystem")
+        if response_unit_system != unit_system:
+            raise WeatherPlatformInvalidResponseError
+
+        return WeatherPlatformRadarData(
+            generated_at=_required_str(payload, "generatedAt"),
+            unit_system=response_unit_system,
+            lightning=_parse_radar_lightning(_as_object(payload.get("lightning"))),
+            storm_tracking=_parse_radar_storm_tracking(
+                _as_object(payload.get("stormTracking"))
+            ),
+        )
+
     async def _async_get_json(
         self,
         resource: str,
@@ -420,6 +529,14 @@ def _optional_bool(payload: dict[str, Any], key: str) -> bool | None:
     if value is None:
         return None
     if not isinstance(value, bool):
+        raise WeatherPlatformInvalidResponseError
+    return value
+
+
+def _required_int(payload: dict[str, Any], key: str) -> int:
+    """Return a required integer value."""
+    value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
         raise WeatherPlatformInvalidResponseError
     return value
 
@@ -522,3 +639,77 @@ def _parse_optional_air_quality_period(
     if value is None:
         return None
     return _parse_air_quality_period(_as_object(value))
+
+
+def _parse_alert(value: Any) -> WeatherPlatformAlert:
+    """Parse an active Weather Platform alert."""
+    payload = _as_object(value)
+    return WeatherPlatformAlert(
+        event=_optional_str(payload, "event"),
+        headline=_optional_str(payload, "headline"),
+        severity=_optional_str(payload, "severity"),
+        level=_optional_str(payload, "level"),
+        critical=_required_bool(payload, "critical"),
+        expires_at=_optional_str(payload, "expiresAt"),
+    )
+
+
+def _parse_radar_lightning(
+    payload: JsonObject,
+) -> WeatherPlatformRadarLightning:
+    """Parse Weather Platform lightning intelligence."""
+    return WeatherPlatformRadarLightning(
+        available=_required_bool(payload, "available"),
+        fetched_at=_optional_str(payload, "fetchedAt"),
+        strike_count=_required_int(payload, "strikeCount"),
+        recent_window_strike_count=_required_int(
+            payload,
+            "recentWindowStrikeCount",
+        ),
+        strike_rate_per_minute=_optional_float(
+            payload,
+            "strikeRatePerMinute",
+        ),
+        recent_strike_rate_per_minute=_optional_float(
+            payload,
+            "recentStrikeRatePerMinute",
+        ),
+        nearest_distance=_optional_float(payload, "nearestDistance"),
+        distance_shift=_optional_float(payload, "distanceShift"),
+        activity_trend=_optional_str(payload, "activityTrend"),
+        rate_trend=_optional_str(payload, "rateTrend"),
+    )
+
+
+def _parse_radar_storm(value: Any) -> WeatherPlatformRadarStorm:
+    """Parse one Weather Platform tracked storm."""
+    payload = _as_object(value)
+    return WeatherPlatformRadarStorm(
+        storm_id=_optional_str(payload, "id"),
+        intensity=_optional_str(payload, "intensity"),
+        lifecycle_stage=_optional_str(payload, "lifecycleStage"),
+        distance=_optional_float(payload, "distance"),
+        peak_reflectivity_dbz=_optional_float(
+            payload,
+            "peakReflectivityDbz",
+        ),
+        approaching_home=_required_bool(payload, "approachingHome"),
+    )
+
+
+def _parse_radar_storm_tracking(
+    payload: JsonObject,
+) -> WeatherPlatformRadarStormTracking:
+    """Parse Weather Platform storm-tracking intelligence."""
+    return WeatherPlatformRadarStormTracking(
+        available=_required_bool(payload, "available"),
+        status=_optional_str(payload, "status"),
+        valid_at=_optional_str(payload, "validAt"),
+        tracked_object_count=_required_int(
+            payload,
+            "trackedObjectCount",
+        ),
+        storms=tuple(
+            _parse_radar_storm(item) for item in _as_list(payload.get("storms"))
+        ),
+    )

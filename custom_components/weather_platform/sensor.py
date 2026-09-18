@@ -16,6 +16,7 @@ from homeassistant.const import (
     EntityCategory,
     UnitOfDensity,
     UnitOfIrradiance,
+    UnitOfLength,
     UnitOfPrecipitationDepth,
     UnitOfTime,
     UnitOfVolumetricFlux,
@@ -47,6 +48,28 @@ AIR_QUALITY_CATEGORIES = [
     "Unavailable",
 ]
 
+ALERT_LEVELS = [
+    "None",
+    "INFO",
+    "ADVISORY",
+    "WATCH",
+    "WARNING",
+]
+
+LIGHTNING_ACTIVITY_TRENDS = [
+    "APPROACHING",
+    "STEADY",
+    "DEPARTING",
+    "UNKNOWN",
+]
+
+LIGHTNING_RATE_TRENDS = [
+    "INCREASING",
+    "STEADY",
+    "DECREASING",
+    "UNKNOWN",
+]
+
 
 @dataclass(frozen=True, kw_only=True)
 class WeatherPlatformSensorEntityDescription(SensorEntityDescription):
@@ -55,6 +78,59 @@ class WeatherPlatformSensorEntityDescription(SensorEntityDescription):
     value_fn: Callable[[WeatherPlatformData], SensorValue]
     imperial_unit: str | None = None
     metric_unit: str | None = None
+
+
+def _highest_alert_level(
+    data: WeatherPlatformData,
+) -> str | None:
+    """Return the highest active alert level."""
+    if data.alerts is None:
+        return None
+
+    if data.alerts.active_count == 0:
+        return "None"
+
+    return data.alerts.highest_level
+
+
+def _approaching_storm_count(
+    data: WeatherPlatformData,
+) -> int | None:
+    """Return the number of tracked storms approaching home."""
+    if data.radar is None or not data.radar.storm_tracking.available:
+        return None
+
+    return sum(storm.approaching_home for storm in data.radar.storm_tracking.storms)
+
+
+def _nearest_storm_distance(
+    data: WeatherPlatformData,
+) -> float | None:
+    """Return the nearest tracked storm distance."""
+    if data.radar is None or not data.radar.storm_tracking.available:
+        return None
+
+    distances = [
+        storm.distance
+        for storm in data.radar.storm_tracking.storms
+        if storm.distance is not None
+    ]
+    return min(distances, default=None)
+
+
+def _strongest_storm_reflectivity(
+    data: WeatherPlatformData,
+) -> float | None:
+    """Return the strongest tracked-storm peak reflectivity."""
+    if data.radar is None or not data.radar.storm_tracking.available:
+        return None
+
+    reflectivities = [
+        storm.peak_reflectivity_dbz
+        for storm in data.radar.storm_tracking.storms
+        if storm.peak_reflectivity_dbz is not None
+    ]
+    return max(reflectivities, default=None)
 
 
 SENSOR_DESCRIPTIONS = (
@@ -180,6 +256,126 @@ SENSOR_DESCRIPTIONS = (
             else data.air_quality.peak_next_24_hours.us_aqi
         ),
         suggested_display_precision=0,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="active_weather_alerts",
+        name="Active weather alerts",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: None if data.alerts is None else data.alerts.active_count,
+        suggested_display_precision=0,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="critical_weather_alerts",
+        name="Critical weather alerts",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: (
+            None if data.alerts is None else data.alerts.critical_count
+        ),
+        suggested_display_precision=0,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="highest_weather_alert_level",
+        name="Highest weather alert level",
+        device_class=SensorDeviceClass.ENUM,
+        options=ALERT_LEVELS,
+        value_fn=_highest_alert_level,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="recent_lightning_strikes",
+        name="Lightning strikes last 2 minutes",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: (
+            None
+            if data.radar is None or not data.radar.lightning.available
+            else data.radar.lightning.recent_window_strike_count
+        ),
+        suggested_display_precision=0,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="lightning_strike_rate",
+        name="Lightning strike rate",
+        state_class=SensorStateClass.MEASUREMENT,
+        imperial_unit="strikes/min",
+        metric_unit="strikes/min",
+        value_fn=lambda data: (
+            None
+            if data.radar is None or not data.radar.lightning.available
+            else data.radar.lightning.recent_strike_rate_per_minute
+        ),
+        suggested_display_precision=2,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="nearest_lightning_distance",
+        name="Nearest lightning distance",
+        device_class=SensorDeviceClass.DISTANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        imperial_unit=UnitOfLength.MILES,
+        metric_unit=UnitOfLength.KILOMETERS,
+        value_fn=lambda data: (
+            None
+            if data.radar is None or not data.radar.lightning.available
+            else data.radar.lightning.nearest_distance
+        ),
+        suggested_display_precision=1,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="lightning_activity_trend",
+        name="Lightning activity trend",
+        device_class=SensorDeviceClass.ENUM,
+        options=LIGHTNING_ACTIVITY_TRENDS,
+        value_fn=lambda data: (
+            None
+            if data.radar is None or not data.radar.lightning.available
+            else data.radar.lightning.activity_trend
+        ),
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="lightning_rate_trend",
+        name="Lightning rate trend",
+        device_class=SensorDeviceClass.ENUM,
+        options=LIGHTNING_RATE_TRENDS,
+        value_fn=lambda data: (
+            None
+            if data.radar is None or not data.radar.lightning.available
+            else data.radar.lightning.rate_trend
+        ),
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="tracked_storms",
+        name="Tracked storms",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: (
+            None
+            if data.radar is None or not data.radar.storm_tracking.available
+            else data.radar.storm_tracking.tracked_object_count
+        ),
+        suggested_display_precision=0,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="approaching_tracked_storms",
+        name="Approaching tracked storms",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_approaching_storm_count,
+        suggested_display_precision=0,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="nearest_tracked_storm_distance",
+        name="Nearest tracked storm distance",
+        device_class=SensorDeviceClass.DISTANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        imperial_unit=UnitOfLength.MILES,
+        metric_unit=UnitOfLength.KILOMETERS,
+        value_fn=_nearest_storm_distance,
+        suggested_display_precision=1,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="strongest_tracked_storm_reflectivity",
+        name="Strongest tracked storm reflectivity",
+        state_class=SensorStateClass.MEASUREMENT,
+        imperial_unit="dBZ",
+        metric_unit="dBZ",
+        value_fn=_strongest_storm_reflectivity,
+        suggested_display_precision=1,
     ),
     WeatherPlatformSensorEntityDescription(
         key="station_data_age",

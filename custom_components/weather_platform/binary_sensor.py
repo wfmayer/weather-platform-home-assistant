@@ -38,18 +38,24 @@ async def async_setup_entry(
                 entry,
                 entry.runtime_data,
             ),
+            WeatherPlatformCriticalAlertBinarySensor(
+                entry,
+                entry.runtime_data,
+            ),
+            WeatherPlatformTrackedStormApproachingBinarySensor(
+                entry,
+                entry.runtime_data,
+            ),
         ]
     )
 
 
-class WeatherPlatformDiagnosticBinarySensor(
+class WeatherPlatformBinarySensor(
     CoordinatorEntity[WeatherPlatformDataUpdateCoordinator],
     BinarySensorEntity,
 ):
-    """Base Weather Platform diagnostic binary sensor."""
+    """Base Weather Platform binary sensor."""
 
-    _attr_device_class = BinarySensorDeviceClass.PROBLEM
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_has_entity_name = True
 
     def __init__(
@@ -58,7 +64,7 @@ class WeatherPlatformDiagnosticBinarySensor(
         coordinator: WeatherPlatformDataUpdateCoordinator,
         key: str,
     ) -> None:
-        """Initialize a Weather Platform diagnostic binary sensor."""
+        """Initialize a Weather Platform binary sensor."""
         super().__init__(coordinator)
 
         identifier = entry.unique_id or entry.entry_id
@@ -80,11 +86,11 @@ class WeatherPlatformDiagnosticBinarySensor(
         )
 
 
-class WeatherPlatformStationDataStaleBinarySensor(
-    WeatherPlatformDiagnosticBinarySensor
-):
+class WeatherPlatformStationDataStaleBinarySensor(WeatherPlatformBinarySensor):
     """Indicate whether Weather Platform considers station data stale."""
 
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_name = "Station data stale"
 
     def __init__(
@@ -102,11 +108,11 @@ class WeatherPlatformStationDataStaleBinarySensor(
         return self.coordinator.data.current.station.stale
 
 
-class WeatherPlatformAirQualityDataStaleBinarySensor(
-    WeatherPlatformDiagnosticBinarySensor
-):
+class WeatherPlatformAirQualityDataStaleBinarySensor(WeatherPlatformBinarySensor):
     """Indicate whether Weather Platform air-quality data is stale."""
 
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_name = "Air quality data stale"
 
     def __init__(
@@ -124,3 +130,53 @@ class WeatherPlatformAirQualityDataStaleBinarySensor(
         if self.coordinator.data.air_quality is None:
             return None
         return self.coordinator.data.air_quality.stale
+
+
+class WeatherPlatformCriticalAlertBinarySensor(WeatherPlatformBinarySensor):
+    """Indicate whether a critical weather alert is active."""
+
+    _attr_device_class = BinarySensorDeviceClass.SAFETY
+    _attr_name = "Critical weather alert"
+
+    def __init__(
+        self,
+        entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
+        coordinator: WeatherPlatformDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the critical-weather-alert binary sensor."""
+        super().__init__(entry, coordinator, "critical_weather_alert")
+
+    @property
+    @override
+    def is_on(self) -> bool | None:
+        """Return whether a critical weather alert is active."""
+        if self.coordinator.data.alerts is None:
+            return None
+        return self.coordinator.data.alerts.critical_count > 0
+
+
+class WeatherPlatformTrackedStormApproachingBinarySensor(WeatherPlatformBinarySensor):
+    """Indicate whether a tracked storm is approaching home."""
+
+    _attr_name = "Tracked storm approaching home"
+
+    def __init__(
+        self,
+        entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
+        coordinator: WeatherPlatformDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the tracked-storm-approaching binary sensor."""
+        super().__init__(
+            entry,
+            coordinator,
+            "tracked_storm_approaching_home",
+        )
+
+    @property
+    @override
+    def is_on(self) -> bool | None:
+        """Return whether a tracked storm is approaching home."""
+        radar = self.coordinator.data.radar
+        if radar is None or not radar.storm_tracking.available:
+            return None
+        return any(storm.approaching_home for storm in radar.storm_tracking.storms)
