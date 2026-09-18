@@ -4,6 +4,7 @@
   "codeowners": [
     "@wfmayer"
   ],
+  "config_flow": true,
   "documentation": "https://github.com/wfmayer/weather-platform-home-assistant",
   "integration_type": "hub",
   "iot_class": "local_polling",

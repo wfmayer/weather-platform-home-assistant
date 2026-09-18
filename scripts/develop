@@ -13,6 +13,10 @@ fi
 # including on the first launch of a freshly built development container.
 USER_SITE="$(python3 -c 'import site; print(site.getusersitepackages())')"
 mkdir -p "${USER_SITE}"
-export PYTHONPATH="${USER_SITE}:${PWD}/custom_components${PYTHONPATH:+:${PYTHONPATH}}"
+
+# Home Assistant imports custom integrations through the top-level
+# custom_components package. Put the repository root on PYTHONPATH so
+# custom_components/weather_platform is discoverable by the running HA process.
+export PYTHONPATH="${USER_SITE}:${PWD}${PYTHONPATH:+:${PYTHONPATH}}"
 
 hass --config "${PWD}/config" --debug
