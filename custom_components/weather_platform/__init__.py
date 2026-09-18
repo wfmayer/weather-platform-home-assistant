@@ -19,7 +19,12 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
-PLATFORMS = (Platform.BINARY_SENSOR, Platform.SENSOR, Platform.WEATHER)
+PLATFORMS = (
+    Platform.BINARY_SENSOR,
+    Platform.EVENT,
+    Platform.SENSOR,
+    Platform.WEATHER,
+)
 
 
 async def async_setup_entry(
