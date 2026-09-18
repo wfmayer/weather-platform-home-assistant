@@ -203,9 +203,7 @@ class WeatherPlatformApiClient:
             resources=resources,
         )
 
-    async def async_get_current(
-        self, unit_system: str
-    ) -> WeatherPlatformCurrentData:
+    async def async_get_current(self, unit_system: str) -> WeatherPlatformCurrentData:
         """Fetch current Weather Platform conditions."""
         payload = await self._async_get_json(
             "current",
@@ -231,12 +229,8 @@ class WeatherPlatformApiClient:
         conditions = WeatherPlatformCurrentConditions(
             temperature=_optional_float(conditions_payload, "temperature"),
             dew_point=_optional_float(conditions_payload, "dewPoint"),
-            relative_humidity=_optional_float(
-                conditions_payload, "relativeHumidity"
-            ),
-            station_pressure=_optional_float(
-                conditions_payload, "stationPressure"
-            ),
+            relative_humidity=_optional_float(conditions_payload, "relativeHumidity"),
+            station_pressure=_optional_float(conditions_payload, "stationPressure"),
             wind_speed=_optional_float(conditions_payload, "windSpeed"),
             wind_gust=_optional_float(conditions_payload, "windGust"),
             wind_direction_degrees=_optional_int(
@@ -245,12 +239,8 @@ class WeatherPlatformApiClient:
             rain_rate=_optional_float(conditions_payload, "rainRate"),
             daily_rain=_optional_float(conditions_payload, "dailyRain"),
             event_rain=_optional_float(conditions_payload, "eventRain"),
-            solar_radiation=_optional_float(
-                conditions_payload, "solarRadiation"
-            ),
-            solar_illuminance=_optional_float(
-                conditions_payload, "solarIlluminance"
-            ),
+            solar_radiation=_optional_float(conditions_payload, "solarRadiation"),
+            solar_illuminance=_optional_float(conditions_payload, "solarIlluminance"),
             uv_index=_optional_float(conditions_payload, "uvIndex"),
         )
 
@@ -262,9 +252,7 @@ class WeatherPlatformApiClient:
             conditions=conditions,
         )
 
-    async def async_get_forecast(
-        self, unit_system: str
-    ) -> WeatherPlatformForecastData:
+    async def async_get_forecast(self, unit_system: str) -> WeatherPlatformForecastData:
         """Fetch Weather Platform forecast data."""
         payload = await self._async_get_json(
             "forecast",
@@ -276,12 +264,10 @@ class WeatherPlatformApiClient:
             raise WeatherPlatformInvalidResponseError
 
         daily = tuple(
-            _parse_daily_forecast(item)
-            for item in _as_list(payload.get("daily"))
+            _parse_daily_forecast(item) for item in _as_list(payload.get("daily"))
         )
         hourly = tuple(
-            _parse_hourly_forecast(item)
-            for item in _as_list(payload.get("hourly"))
+            _parse_hourly_forecast(item) for item in _as_list(payload.get("hourly"))
         )
 
         return WeatherPlatformForecastData(
@@ -412,9 +398,7 @@ def _parse_hourly_forecast(value: Any) -> WeatherPlatformHourlyForecast:
     return WeatherPlatformHourlyForecast(
         valid_at=_required_str(payload, "validAt"),
         temperature=_optional_float(payload, "temperature"),
-        precipitation_probability=_optional_int(
-            payload, "precipitationChancePercent"
-        ),
+        precipitation_probability=_optional_int(payload, "precipitationChancePercent"),
         short_forecast=_optional_str(payload, "shortForecast"),
         wind=_parse_wind(payload.get("wind")),
         wind_gust=_optional_float(payload, "windGust"),
@@ -434,8 +418,6 @@ def _parse_daily_forecast(value: Any) -> WeatherPlatformDailyForecast:
         display_name=_required_str(payload, "displayName"),
         high_temperature=_optional_float(payload, "highTemperature"),
         low_temperature=_optional_float(payload, "lowTemperature"),
-        precipitation_probability=_optional_int(
-            payload, "precipitationChancePercent"
-        ),
+        precipitation_probability=_optional_int(payload, "precipitationChancePercent"),
         short_forecast=_optional_str(payload, "shortForecast"),
     )
