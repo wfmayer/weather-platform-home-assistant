@@ -128,6 +128,35 @@ class WeatherPlatformForecastData:
     hourly: tuple[WeatherPlatformHourlyForecast, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformAirQualityPeriod:
+    """Air-quality guidance for a point in time."""
+
+    valid_at: str | None
+    us_aqi: int | None
+    category: str | None
+    category_headline: str | None
+    health_advice: str | None
+    dominant_pollutant: str | None
+    dominant_pollutant_aqi: int | None
+    pm25: float | None
+    pm10: float | None
+    ozone: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformAirQualityData:
+    """Air-quality guidance reported by Weather Platform."""
+
+    generated_at: str
+    provider: str | None
+    model: str | None
+    fetched_at: str | None
+    stale: bool
+    current: WeatherPlatformAirQualityPeriod
+    peak_next_24_hours: WeatherPlatformAirQualityPeriod | None
+
+
 def normalize_base_url(value: str) -> str:
     """Normalize a Weather Platform application base URL."""
     candidate = value.strip()
@@ -203,7 +232,10 @@ class WeatherPlatformApiClient:
             resources=resources,
         )
 
-    async def async_get_current(self, unit_system: str) -> WeatherPlatformCurrentData:
+    async def async_get_current(
+        self,
+        unit_system: str,
+    ) -> WeatherPlatformCurrentData:
         """Fetch current Weather Platform conditions."""
         payload = await self._async_get_json(
             "current",
@@ -229,18 +261,31 @@ class WeatherPlatformApiClient:
         conditions = WeatherPlatformCurrentConditions(
             temperature=_optional_float(conditions_payload, "temperature"),
             dew_point=_optional_float(conditions_payload, "dewPoint"),
-            relative_humidity=_optional_float(conditions_payload, "relativeHumidity"),
-            station_pressure=_optional_float(conditions_payload, "stationPressure"),
+            relative_humidity=_optional_float(
+                conditions_payload,
+                "relativeHumidity",
+            ),
+            station_pressure=_optional_float(
+                conditions_payload,
+                "stationPressure",
+            ),
             wind_speed=_optional_float(conditions_payload, "windSpeed"),
             wind_gust=_optional_float(conditions_payload, "windGust"),
             wind_direction_degrees=_optional_int(
-                conditions_payload, "windDirectionDegrees"
+                conditions_payload,
+                "windDirectionDegrees",
             ),
             rain_rate=_optional_float(conditions_payload, "rainRate"),
             daily_rain=_optional_float(conditions_payload, "dailyRain"),
             event_rain=_optional_float(conditions_payload, "eventRain"),
-            solar_radiation=_optional_float(conditions_payload, "solarRadiation"),
-            solar_illuminance=_optional_float(conditions_payload, "solarIlluminance"),
+            solar_radiation=_optional_float(
+                conditions_payload,
+                "solarRadiation",
+            ),
+            solar_illuminance=_optional_float(
+                conditions_payload,
+                "solarIlluminance",
+            ),
             uv_index=_optional_float(conditions_payload, "uvIndex"),
         )
 
@@ -252,7 +297,10 @@ class WeatherPlatformApiClient:
             conditions=conditions,
         )
 
-    async def async_get_forecast(self, unit_system: str) -> WeatherPlatformForecastData:
+    async def async_get_forecast(
+        self,
+        unit_system: str,
+    ) -> WeatherPlatformForecastData:
         """Fetch Weather Platform forecast data."""
         payload = await self._async_get_json(
             "forecast",
@@ -277,6 +325,23 @@ class WeatherPlatformApiClient:
             hourly_available=_required_bool(payload, "hourlyAvailable"),
             daily=daily,
             hourly=hourly,
+        )
+
+    async def async_get_air_quality(self) -> WeatherPlatformAirQualityData:
+        """Fetch Weather Platform air-quality guidance."""
+        payload = await self._async_get_json("air-quality")
+        current_payload = _as_object(payload.get("current"))
+
+        return WeatherPlatformAirQualityData(
+            generated_at=_required_str(payload, "generatedAt"),
+            provider=_optional_str(payload, "provider"),
+            model=_optional_str(payload, "model"),
+            fetched_at=_optional_str(payload, "fetchedAt"),
+            stale=_required_bool(payload, "stale"),
+            current=_parse_air_quality_period(current_payload),
+            peak_next_24_hours=_parse_optional_air_quality_period(
+                payload.get("peakNext24Hours")
+            ),
         )
 
     async def _async_get_json(
@@ -398,7 +463,10 @@ def _parse_hourly_forecast(value: Any) -> WeatherPlatformHourlyForecast:
     return WeatherPlatformHourlyForecast(
         valid_at=_required_str(payload, "validAt"),
         temperature=_optional_float(payload, "temperature"),
-        precipitation_probability=_optional_int(payload, "precipitationChancePercent"),
+        precipitation_probability=_optional_int(
+            payload,
+            "precipitationChancePercent",
+        ),
         short_forecast=_optional_str(payload, "shortForecast"),
         wind=_parse_wind(payload.get("wind")),
         wind_gust=_optional_float(payload, "windGust"),
@@ -418,6 +486,39 @@ def _parse_daily_forecast(value: Any) -> WeatherPlatformDailyForecast:
         display_name=_required_str(payload, "displayName"),
         high_temperature=_optional_float(payload, "highTemperature"),
         low_temperature=_optional_float(payload, "lowTemperature"),
-        precipitation_probability=_optional_int(payload, "precipitationChancePercent"),
+        precipitation_probability=_optional_int(
+            payload,
+            "precipitationChancePercent",
+        ),
         short_forecast=_optional_str(payload, "shortForecast"),
     )
+
+
+def _parse_air_quality_period(
+    payload: JsonObject,
+) -> WeatherPlatformAirQualityPeriod:
+    """Parse Weather Platform air-quality guidance."""
+    return WeatherPlatformAirQualityPeriod(
+        valid_at=_optional_str(payload, "validAt"),
+        us_aqi=_optional_int(payload, "usAqi"),
+        category=_optional_str(payload, "category"),
+        category_headline=_optional_str(payload, "categoryHeadline"),
+        health_advice=_optional_str(payload, "healthAdvice"),
+        dominant_pollutant=_optional_str(payload, "dominantPollutant"),
+        dominant_pollutant_aqi=_optional_int(
+            payload,
+            "dominantPollutantAqi",
+        ),
+        pm25=_optional_float(payload, "pm25"),
+        pm10=_optional_float(payload, "pm10"),
+        ozone=_optional_float(payload, "ozone"),
+    )
+
+
+def _parse_optional_air_quality_period(
+    value: Any,
+) -> WeatherPlatformAirQualityPeriod | None:
+    """Parse an optional Weather Platform air-quality period."""
+    if value is None:
+        return None
+    return _parse_air_quality_period(_as_object(value))

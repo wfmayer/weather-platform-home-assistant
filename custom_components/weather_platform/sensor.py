@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     LIGHT_LUX,
     EntityCategory,
+    UnitOfDensity,
     UnitOfIrradiance,
     UnitOfPrecipitationDepth,
     UnitOfTime,
@@ -34,7 +35,17 @@ if TYPE_CHECKING:
 
     from .coordinator import WeatherPlatformData
 
-type SensorValue = float | int | None
+type SensorValue = float | int | str | None
+
+AIR_QUALITY_CATEGORIES = [
+    "Good",
+    "Moderate",
+    "Unhealthy for Sensitive Groups",
+    "Unhealthy",
+    "Very Unhealthy",
+    "Hazardous",
+    "Unavailable",
+]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -95,6 +106,79 @@ SENSOR_DESCRIPTIONS = (
         imperial_unit=LIGHT_LUX,
         metric_unit=LIGHT_LUX,
         value_fn=lambda data: data.current.conditions.solar_illuminance,
+        suggested_display_precision=0,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="air_quality_index",
+        name="Air quality index",
+        device_class=SensorDeviceClass.AQI,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: (
+            None if data.air_quality is None else data.air_quality.current.us_aqi
+        ),
+        suggested_display_precision=0,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="air_quality_category",
+        name="Air quality category",
+        device_class=SensorDeviceClass.ENUM,
+        options=AIR_QUALITY_CATEGORIES,
+        value_fn=lambda data: (
+            None if data.air_quality is None else data.air_quality.current.category
+        ),
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="air_quality_guidance",
+        name="Air quality guidance",
+        value_fn=lambda data: (
+            None if data.air_quality is None else data.air_quality.current.health_advice
+        ),
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="pm25",
+        name="PM2.5",
+        device_class=SensorDeviceClass.PM25,
+        state_class=SensorStateClass.MEASUREMENT,
+        imperial_unit=UnitOfDensity.MICROGRAMS_PER_CUBIC_METER,
+        metric_unit=UnitOfDensity.MICROGRAMS_PER_CUBIC_METER,
+        value_fn=lambda data: (
+            None if data.air_quality is None else data.air_quality.current.pm25
+        ),
+        suggested_display_precision=1,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="pm10",
+        name="PM10",
+        device_class=SensorDeviceClass.PM10,
+        state_class=SensorStateClass.MEASUREMENT,
+        imperial_unit=UnitOfDensity.MICROGRAMS_PER_CUBIC_METER,
+        metric_unit=UnitOfDensity.MICROGRAMS_PER_CUBIC_METER,
+        value_fn=lambda data: (
+            None if data.air_quality is None else data.air_quality.current.pm10
+        ),
+        suggested_display_precision=1,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="ozone",
+        name="Ozone",
+        device_class=SensorDeviceClass.OZONE,
+        state_class=SensorStateClass.MEASUREMENT,
+        imperial_unit=UnitOfDensity.MICROGRAMS_PER_CUBIC_METER,
+        metric_unit=UnitOfDensity.MICROGRAMS_PER_CUBIC_METER,
+        value_fn=lambda data: (
+            None if data.air_quality is None else data.air_quality.current.ozone
+        ),
+        suggested_display_precision=1,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="peak_air_quality_index_next_24_hours",
+        name="Peak air quality index next 24 hours",
+        device_class=SensorDeviceClass.AQI,
+        value_fn=lambda data: (
+            None
+            if data.air_quality is None or data.air_quality.peak_next_24_hours is None
+            else data.air_quality.peak_next_24_hours.us_aqi
+        ),
         suggested_display_precision=0,
     ),
     WeatherPlatformSensorEntityDescription(

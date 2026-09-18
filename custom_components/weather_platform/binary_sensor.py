@@ -29,31 +29,40 @@ async def async_setup_entry(
     """Add Weather Platform binary sensor entities."""
     del hass
     async_add_entities(
-        [WeatherPlatformStationDataStaleBinarySensor(entry, entry.runtime_data)]
+        [
+            WeatherPlatformStationDataStaleBinarySensor(
+                entry,
+                entry.runtime_data,
+            ),
+            WeatherPlatformAirQualityDataStaleBinarySensor(
+                entry,
+                entry.runtime_data,
+            ),
+        ]
     )
 
 
-class WeatherPlatformStationDataStaleBinarySensor(
+class WeatherPlatformDiagnosticBinarySensor(
     CoordinatorEntity[WeatherPlatformDataUpdateCoordinator],
     BinarySensorEntity,
 ):
-    """Indicate whether Weather Platform considers station data stale."""
+    """Base Weather Platform diagnostic binary sensor."""
 
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_has_entity_name = True
-    _attr_name = "Station data stale"
 
     def __init__(
         self,
         entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
         coordinator: WeatherPlatformDataUpdateCoordinator,
+        key: str,
     ) -> None:
-        """Initialize the station data stale binary sensor."""
+        """Initialize a Weather Platform diagnostic binary sensor."""
         super().__init__(coordinator)
 
         identifier = entry.unique_id or entry.entry_id
-        self._attr_unique_id = f"{identifier}:station_data_stale"
+        self._attr_unique_id = f"{identifier}:{key}"
 
         platform_version = (
             coordinator.metadata.platform_version
@@ -70,8 +79,48 @@ class WeatherPlatformStationDataStaleBinarySensor(
             entry_type=DeviceEntryType.SERVICE,
         )
 
+
+class WeatherPlatformStationDataStaleBinarySensor(
+    WeatherPlatformDiagnosticBinarySensor
+):
+    """Indicate whether Weather Platform considers station data stale."""
+
+    _attr_name = "Station data stale"
+
+    def __init__(
+        self,
+        entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
+        coordinator: WeatherPlatformDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the station data stale binary sensor."""
+        super().__init__(entry, coordinator, "station_data_stale")
+
     @property
     @override
     def is_on(self) -> bool:
         """Return whether station data is stale."""
         return self.coordinator.data.current.station.stale
+
+
+class WeatherPlatformAirQualityDataStaleBinarySensor(
+    WeatherPlatformDiagnosticBinarySensor
+):
+    """Indicate whether Weather Platform air-quality data is stale."""
+
+    _attr_name = "Air quality data stale"
+
+    def __init__(
+        self,
+        entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
+        coordinator: WeatherPlatformDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the air-quality stale binary sensor."""
+        super().__init__(entry, coordinator, "air_quality_data_stale")
+
+    @property
+    @override
+    def is_on(self) -> bool | None:
+        """Return whether air-quality guidance is stale."""
+        if self.coordinator.data.air_quality is None:
+            return None
+        return self.coordinator.data.air_quality.stale

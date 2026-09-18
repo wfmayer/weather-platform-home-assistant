@@ -8,7 +8,10 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, override
 
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import (
+    DataUpdateCoordinator,
+    UpdateFailed,
+)
 
 from .api import WeatherPlatformApiClient, WeatherPlatformApiError
 from .const import DOMAIN, UPDATE_INTERVAL_SECONDS
@@ -18,6 +21,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
     from .api import (
+        WeatherPlatformAirQualityData,
         WeatherPlatformCurrentData,
         WeatherPlatformForecastData,
         WeatherPlatformMetadata,
@@ -32,6 +36,7 @@ class WeatherPlatformData:
 
     current: WeatherPlatformCurrentData
     forecast: WeatherPlatformForecastData
+    air_quality: WeatherPlatformAirQualityData | None
 
 
 class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatformData]):
@@ -68,7 +73,7 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
 
     @override
     async def _async_update_data(self) -> WeatherPlatformData:
-        """Fetch current conditions and forecast data."""
+        """Fetch Weather Platform coordinator data."""
         try:
             current, forecast = await asyncio.gather(
                 self.client.async_get_current(self.unit_system),
@@ -77,7 +82,23 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
         except WeatherPlatformApiError as err:
             raise UpdateFailed from err
 
+        air_quality = await self._async_get_air_quality()
+
         return WeatherPlatformData(
             current=current,
             forecast=forecast,
+            air_quality=air_quality,
         )
+
+    async def _async_get_air_quality(
+        self,
+    ) -> WeatherPlatformAirQualityData | None:
+        """Fetch optional air-quality guidance without failing core weather."""
+        try:
+            return await self.client.async_get_air_quality()
+        except WeatherPlatformApiError:
+            _LOGGER.debug(
+                "Weather Platform air-quality guidance is unavailable",
+                exc_info=True,
+            )
+            return None
