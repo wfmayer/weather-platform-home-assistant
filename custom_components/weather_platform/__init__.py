@@ -1,4 +1,4 @@
-"""Weather Platform integration."""
+"""Tests for the Weather Platform integration."""
 
 from __future__ import annotations
 

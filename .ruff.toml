@@ -13,6 +13,13 @@ ignore = [
     "ISC001",
 ]
 
+[lint.per-file-ignores]
+"tests/**/*.py" = [
+    "PLR2004",
+    "S101",
+    "SLF001",
+]
+
 [lint.flake8-pytest-style]
 fixture-parentheses = false
 
