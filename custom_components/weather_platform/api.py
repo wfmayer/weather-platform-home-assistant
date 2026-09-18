@@ -229,6 +229,53 @@ class WeatherPlatformRadarData:
     storm_tracking: WeatherPlatformRadarStormTracking
 
 
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformEvent:
+    """One active Weather Platform weather event."""
+
+    event_type: str
+    type_label: str | None
+    phase: str | None
+    phase_label: str | None
+    priority: str
+    priority_label: str | None
+    trigger_source: str | None
+    detected_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformEventsData:
+    """Active durable weather events reported by Weather Platform."""
+
+    generated_at: str
+    count: int
+    events: tuple[WeatherPlatformEvent, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformImpactProfile:
+    """Current Weather Platform impact-profile guidance."""
+
+    key: str
+    title: str
+    current_rating: str | None
+    current_status: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class WeatherPlatformImpactsData:
+    """Weather-impact guidance reported by Weather Platform."""
+
+    generated_at: str | None
+    unit_system: str
+    horizon_hours: int
+    headline: str | None
+    summary: str | None
+    radar_hazard_active: bool
+    radar_detail: str | None
+    profiles: tuple[WeatherPlatformImpactProfile, ...]
+
+
 def normalize_base_url(value: str) -> str:
     """Normalize a Weather Platform application base URL."""
     candidate = value.strip()
@@ -450,6 +497,58 @@ class WeatherPlatformApiClient:
             lightning=_parse_radar_lightning(_as_object(payload.get("lightning"))),
             storm_tracking=_parse_radar_storm_tracking(
                 _as_object(payload.get("stormTracking"))
+            ),
+        )
+
+    async def async_get_active_events(self) -> WeatherPlatformEventsData:
+        """Fetch active durable Weather Platform weather events."""
+        payload = await self._async_get_json(
+            "events",
+            params={
+                "category": "WEATHER",
+                "state": "ACTIVE",
+                "limit": "500",
+            },
+        )
+
+        return WeatherPlatformEventsData(
+            generated_at=_required_str(payload, "generatedAt"),
+            count=_required_int(payload, "count"),
+            events=tuple(
+                _parse_event(item) for item in _as_list(payload.get("events"))
+            ),
+        )
+
+    async def async_get_impacts(
+        self,
+        unit_system: str,
+    ) -> WeatherPlatformImpactsData:
+        """Fetch Weather Platform impact guidance."""
+        payload = await self._async_get_json(
+            "impacts",
+            params={"units": unit_system},
+        )
+
+        response_unit_system = _required_str(payload, "unitSystem")
+        if response_unit_system != unit_system:
+            raise WeatherPlatformInvalidResponseError
+
+        radar_payload = _as_object(payload.get("radar"))
+
+        return WeatherPlatformImpactsData(
+            generated_at=_optional_str(payload, "generatedAt"),
+            unit_system=response_unit_system,
+            horizon_hours=_required_int(payload, "horizonHours"),
+            headline=_optional_str(payload, "headline"),
+            summary=_optional_str(payload, "summary"),
+            radar_hazard_active=_required_bool(
+                radar_payload,
+                "hazardActive",
+            ),
+            radar_detail=_optional_str(radar_payload, "detail"),
+            profiles=tuple(
+                _parse_impact_profile(item)
+                for item in _as_list(payload.get("profiles"))
             ),
         )
 
@@ -712,4 +811,30 @@ def _parse_radar_storm_tracking(
         storms=tuple(
             _parse_radar_storm(item) for item in _as_list(payload.get("storms"))
         ),
+    )
+
+
+def _parse_event(value: Any) -> WeatherPlatformEvent:
+    """Parse one active Weather Platform weather event."""
+    payload = _as_object(value)
+    return WeatherPlatformEvent(
+        event_type=_required_str(payload, "type"),
+        type_label=_optional_str(payload, "typeLabel"),
+        phase=_optional_str(payload, "phase"),
+        phase_label=_optional_str(payload, "phaseLabel"),
+        priority=_required_str(payload, "priority"),
+        priority_label=_optional_str(payload, "priorityLabel"),
+        trigger_source=_optional_str(payload, "triggerSource"),
+        detected_at=_optional_str(payload, "detectedAt"),
+    )
+
+
+def _parse_impact_profile(value: Any) -> WeatherPlatformImpactProfile:
+    """Parse one Weather Platform impact profile."""
+    payload = _as_object(value)
+    return WeatherPlatformImpactProfile(
+        key=_required_str(payload, "key"),
+        title=_required_str(payload, "title"),
+        current_rating=_optional_str(payload, "currentRating"),
+        current_status=_optional_str(payload, "currentStatus"),
     )

@@ -24,7 +24,9 @@ if TYPE_CHECKING:
         WeatherPlatformAirQualityData,
         WeatherPlatformAlertsData,
         WeatherPlatformCurrentData,
+        WeatherPlatformEventsData,
         WeatherPlatformForecastData,
+        WeatherPlatformImpactsData,
         WeatherPlatformMetadata,
         WeatherPlatformRadarData,
     )
@@ -41,6 +43,8 @@ class WeatherPlatformData:
     air_quality: WeatherPlatformAirQualityData | None
     alerts: WeatherPlatformAlertsData | None
     radar: WeatherPlatformRadarData | None
+    events: WeatherPlatformEventsData | None
+    impacts: WeatherPlatformImpactsData | None
 
 
 class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatformData]):
@@ -86,10 +90,12 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
         except WeatherPlatformApiError as err:
             raise UpdateFailed from err
 
-        air_quality, alerts, radar = await asyncio.gather(
+        air_quality, alerts, radar, events, impacts = await asyncio.gather(
             self._async_get_air_quality(),
             self._async_get_alerts(),
             self._async_get_radar(),
+            self._async_get_active_events(),
+            self._async_get_impacts(),
         )
 
         return WeatherPlatformData(
@@ -98,6 +104,8 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
             air_quality=air_quality,
             alerts=alerts,
             radar=radar,
+            events=events,
+            impacts=impacts,
         )
 
     async def _async_get_air_quality(
@@ -131,6 +139,30 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
         except WeatherPlatformApiError:
             _LOGGER.debug(
                 "Weather Platform radar intelligence is unavailable",
+                exc_info=True,
+            )
+            return None
+
+    async def _async_get_active_events(
+        self,
+    ) -> WeatherPlatformEventsData | None:
+        """Fetch optional durable active weather events."""
+        try:
+            return await self.client.async_get_active_events()
+        except WeatherPlatformApiError:
+            _LOGGER.debug(
+                "Weather Platform active events are unavailable",
+                exc_info=True,
+            )
+            return None
+
+    async def _async_get_impacts(self) -> WeatherPlatformImpactsData | None:
+        """Fetch optional weather-impact guidance."""
+        try:
+            return await self.client.async_get_impacts(self.unit_system)
+        except WeatherPlatformApiError:
+            _LOGGER.debug(
+                "Weather Platform impact guidance is unavailable",
                 exc_info=True,
             )
             return None

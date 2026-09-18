@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+    from .api import WeatherPlatformImpactProfile
     from .coordinator import WeatherPlatformData
 
 type SensorValue = float | int | str | None
@@ -68,6 +69,21 @@ LIGHTNING_RATE_TRENDS = [
     "STEADY",
     "DECREASING",
     "UNKNOWN",
+]
+
+EVENT_PRIORITIES = [
+    "None",
+    "NORMAL",
+    "TIME_SENSITIVE",
+    "CRITICAL",
+]
+
+IMPACT_RATINGS = [
+    "excellent",
+    "good",
+    "caution",
+    "poor",
+    "unavailable",
 ]
 
 
@@ -131,6 +147,74 @@ def _strongest_storm_reflectivity(
         if storm.peak_reflectivity_dbz is not None
     ]
     return max(reflectivities, default=None)
+
+
+def _highest_event_priority(
+    data: WeatherPlatformData,
+) -> str | None:
+    """Return the highest active durable weather-event priority."""
+    if data.events is None:
+        return None
+
+    if not data.events.events:
+        return "None"
+
+    for priority in reversed(EVENT_PRIORITIES[1:]):
+        if any(event.priority == priority for event in data.events.events):
+            return priority
+
+    return "None"
+
+
+def _latest_active_event(
+    data: WeatherPlatformData,
+) -> str | None:
+    """Return the newest active durable weather-event type."""
+    if data.events is None:
+        return None
+
+    if not data.events.events:
+        return "None"
+
+    event = data.events.events[0]
+    return event.type_label or event.event_type
+
+
+def _latest_active_event_phase(
+    data: WeatherPlatformData,
+) -> str | None:
+    """Return the newest active durable weather-event phase."""
+    if data.events is None:
+        return None
+
+    if not data.events.events:
+        return "None"
+
+    event = data.events.events[0]
+    return event.phase_label or event.phase or "None"
+
+
+def _impact_profile(
+    data: WeatherPlatformData,
+    key: str,
+) -> WeatherPlatformImpactProfile | None:
+    """Return an impact profile by key."""
+    if data.impacts is None:
+        return None
+
+    return next(
+        (profile for profile in data.impacts.profiles if profile.key == key),
+        None,
+    )
+
+
+def _impact_rating(
+    data: WeatherPlatformData,
+    key: str,
+) -> str | None:
+    """Return the current rating for an impact profile."""
+    profile = _impact_profile(data, key)
+    return None if profile is None else profile.current_rating
 
 
 SENSOR_DESCRIPTIONS = (
@@ -376,6 +460,77 @@ SENSOR_DESCRIPTIONS = (
         metric_unit="dBZ",
         value_fn=_strongest_storm_reflectivity,
         suggested_display_precision=1,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="active_weather_platform_events",
+        name="Active Weather Platform events",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: None if data.events is None else data.events.count,
+        suggested_display_precision=0,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="highest_event_priority",
+        name="Highest event priority",
+        device_class=SensorDeviceClass.ENUM,
+        options=EVENT_PRIORITIES,
+        value_fn=_highest_event_priority,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="latest_active_event",
+        name="Latest active event",
+        value_fn=_latest_active_event,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="latest_active_event_phase",
+        name="Latest active event phase",
+        value_fn=_latest_active_event_phase,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="impact_forecast",
+        name="Impact forecast",
+        value_fn=lambda data: None if data.impacts is None else data.impacts.headline,
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="outdoor_activity_impact",
+        name="Outdoor activity impact",
+        device_class=SensorDeviceClass.ENUM,
+        options=IMPACT_RATINGS,
+        value_fn=lambda data: _impact_rating(data, "outdoor"),
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="open_windows_impact",
+        name="Open windows impact",
+        device_class=SensorDeviceClass.ENUM,
+        options=IMPACT_RATINGS,
+        value_fn=lambda data: _impact_rating(data, "windows"),
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="yard_work_impact",
+        name="Yard work impact",
+        device_class=SensorDeviceClass.ENUM,
+        options=IMPACT_RATINGS,
+        value_fn=lambda data: _impact_rating(data, "yard"),
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="drying_conditions_impact",
+        name="Drying conditions impact",
+        device_class=SensorDeviceClass.ENUM,
+        options=IMPACT_RATINGS,
+        value_fn=lambda data: _impact_rating(data, "drying"),
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="frost_risk_impact",
+        name="Frost risk impact",
+        device_class=SensorDeviceClass.ENUM,
+        options=IMPACT_RATINGS,
+        value_fn=lambda data: _impact_rating(data, "frost"),
+    ),
+    WeatherPlatformSensorEntityDescription(
+        key="sun_exposure_impact",
+        name="Sun exposure impact",
+        device_class=SensorDeviceClass.ENUM,
+        options=IMPACT_RATINGS,
+        value_fn=lambda data: _impact_rating(data, "sun"),
     ),
     WeatherPlatformSensorEntityDescription(
         key="station_data_age",
