@@ -297,9 +297,7 @@ GitHub Actions runs both commands automatically for pushes to `main` and pull
 requests targeting `main`.
 
 A separate validation workflow runs both hassfest and the HACS repository
-validator. The HACS topics check is temporarily ignored while the repository is
-private and has no GitHub topics configured. Remove that ignore after adding
-repository topics for public distribution.
+validator.
 
 ## Releases
 
