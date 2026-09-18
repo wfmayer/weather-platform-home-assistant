@@ -38,6 +38,10 @@ async def async_setup_entry(
                 entry,
                 entry.runtime_data,
             ),
+            WeatherPlatformOptionalApiDataUnavailableBinarySensor(
+                entry,
+                entry.runtime_data,
+            ),
             WeatherPlatformCriticalAlertBinarySensor(
                 entry,
                 entry.runtime_data,
@@ -130,6 +134,41 @@ class WeatherPlatformAirQualityDataStaleBinarySensor(WeatherPlatformBinarySensor
         if self.coordinator.data.air_quality is None:
             return None
         return self.coordinator.data.air_quality.stale
+
+
+class WeatherPlatformOptionalApiDataUnavailableBinarySensor(
+    WeatherPlatformBinarySensor
+):
+    """Indicate whether any optional Weather Platform API feed failed."""
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_name = "Optional API data unavailable"
+
+    def __init__(
+        self,
+        entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
+        coordinator: WeatherPlatformDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the optional API health binary sensor."""
+        super().__init__(entry, coordinator, "optional_api_data_unavailable")
+
+    @property
+    @override
+    def is_on(self) -> bool:
+        """Return whether any optional endpoint failed on the latest refresh."""
+        return self.coordinator.optional_api_degraded
+
+    @property
+    @override
+    def extra_state_attributes(self) -> dict[str, object]:
+        """Return optional endpoint health details."""
+        return {
+            "unavailable_endpoints": list(
+                self.coordinator.unavailable_optional_endpoints
+            ),
+            "endpoint_status": self.coordinator.optional_endpoint_status,
+        }
 
 
 class WeatherPlatformCriticalAlertBinarySensor(WeatherPlatformBinarySensor):

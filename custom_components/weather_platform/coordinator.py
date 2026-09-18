@@ -33,6 +33,14 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+OPTIONAL_ENDPOINTS = (
+    "air_quality",
+    "alerts",
+    "radar",
+    "events",
+    "impacts",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class WeatherPlatformData:
@@ -61,6 +69,9 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
         self.client = client
         self.unit_system = unit_system
         self.metadata: WeatherPlatformMetadata | None = None
+        self._optional_endpoint_status: dict[str, bool | None] = dict.fromkeys(
+            OPTIONAL_ENDPOINTS
+        )
 
         super().__init__(
             hass,
@@ -70,6 +81,25 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
             update_interval=timedelta(seconds=UPDATE_INTERVAL_SECONDS),
             always_update=False,
         )
+
+    @property
+    def optional_endpoint_status(self) -> dict[str, bool | None]:
+        """Return availability for optional Weather Platform API endpoints."""
+        return dict(self._optional_endpoint_status)
+
+    @property
+    def unavailable_optional_endpoints(self) -> tuple[str, ...]:
+        """Return optional endpoints that failed during the latest refresh."""
+        return tuple(
+            endpoint
+            for endpoint, available in self._optional_endpoint_status.items()
+            if available is False
+        )
+
+    @property
+    def optional_api_degraded(self) -> bool:
+        """Return whether any optional Weather Platform API endpoint failed."""
+        return bool(self.unavailable_optional_endpoints)
 
     @override
     async def _async_setup(self) -> None:
@@ -108,61 +138,103 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
             impacts=impacts,
         )
 
+    def _set_optional_endpoint_status(
+        self,
+        endpoint: str,
+        *,
+        available: bool,
+    ) -> None:
+        """Record optional endpoint health and log status transitions."""
+        previous = self._optional_endpoint_status[endpoint]
+        self._optional_endpoint_status[endpoint] = available
+
+        if not available and previous is not False:
+            _LOGGER.warning(
+                "Weather Platform optional API endpoint %s is unavailable; "
+                "core weather data will continue updating",
+                endpoint,
+            )
+        elif available and previous is False:
+            _LOGGER.info(
+                "Weather Platform optional API endpoint %s recovered",
+                endpoint,
+            )
+
     async def _async_get_air_quality(
         self,
     ) -> WeatherPlatformAirQualityData | None:
         """Fetch optional air-quality guidance."""
         try:
-            return await self.client.async_get_air_quality()
+            result = await self.client.async_get_air_quality()
         except WeatherPlatformApiError:
+            self._set_optional_endpoint_status("air_quality", available=False)
             _LOGGER.debug(
                 "Weather Platform air-quality guidance is unavailable",
                 exc_info=True,
             )
             return None
 
+        self._set_optional_endpoint_status("air_quality", available=True)
+        return result
+
     async def _async_get_alerts(self) -> WeatherPlatformAlertsData | None:
         """Fetch optional active-alert intelligence."""
         try:
-            return await self.client.async_get_alerts()
+            result = await self.client.async_get_alerts()
         except WeatherPlatformApiError:
+            self._set_optional_endpoint_status("alerts", available=False)
             _LOGGER.debug(
                 "Weather Platform active-alert intelligence is unavailable",
                 exc_info=True,
             )
             return None
 
+        self._set_optional_endpoint_status("alerts", available=True)
+        return result
+
     async def _async_get_radar(self) -> WeatherPlatformRadarData | None:
         """Fetch optional radar intelligence."""
         try:
-            return await self.client.async_get_radar(self.unit_system)
+            result = await self.client.async_get_radar(self.unit_system)
         except WeatherPlatformApiError:
+            self._set_optional_endpoint_status("radar", available=False)
             _LOGGER.debug(
                 "Weather Platform radar intelligence is unavailable",
                 exc_info=True,
             )
             return None
 
+        self._set_optional_endpoint_status("radar", available=True)
+        return result
+
     async def _async_get_active_events(
         self,
     ) -> WeatherPlatformEventsData | None:
         """Fetch optional durable active weather events."""
         try:
-            return await self.client.async_get_active_events()
+            result = await self.client.async_get_active_events()
         except WeatherPlatformApiError:
+            self._set_optional_endpoint_status("events", available=False)
             _LOGGER.debug(
                 "Weather Platform active events are unavailable",
                 exc_info=True,
             )
             return None
 
+        self._set_optional_endpoint_status("events", available=True)
+        return result
+
     async def _async_get_impacts(self) -> WeatherPlatformImpactsData | None:
         """Fetch optional weather-impact guidance."""
         try:
-            return await self.client.async_get_impacts(self.unit_system)
+            result = await self.client.async_get_impacts(self.unit_system)
         except WeatherPlatformApiError:
+            self._set_optional_endpoint_status("impacts", available=False)
             _LOGGER.debug(
                 "Weather Platform impact guidance is unavailable",
                 exc_info=True,
             )
             return None
+
+        self._set_optional_endpoint_status("impacts", available=True)
+        return result
