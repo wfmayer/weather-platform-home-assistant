@@ -1,5 +1,6 @@
 """Tests for the Weather Platform data coordinator."""
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, sentinel
 
 import pytest
@@ -24,6 +25,10 @@ def _client() -> MagicMock:
     client.async_get_radar = AsyncMock(return_value=sentinel.radar)
     client.async_get_active_events = AsyncMock(return_value=sentinel.events)
     client.async_get_impacts = AsyncMock(return_value=sentinel.impacts)
+    client.async_get_today = AsyncMock(return_value=sentinel.today)
+    client.async_get_hydrology = AsyncMock(return_value=sentinel.hydrology)
+    client.async_get_climate = AsyncMock(return_value=sentinel.climate)
+    client.async_get_meteorology = AsyncMock(return_value=sentinel.meteorology)
     return client
 
 
@@ -48,6 +53,10 @@ async def test_optional_endpoint_failure_keeps_core_data_available() -> None:
     assert data.forecast is sentinel.forecast
     assert data.air_quality is None
     assert data.alerts is sentinel.alerts
+    assert data.today is sentinel.today
+    assert data.hydrology is sentinel.hydrology
+    assert data.climate is sentinel.climate
+    assert data.meteorology is sentinel.meteorology
     assert coordinator.optional_api_degraded is True
     assert coordinator.unavailable_optional_endpoints == ("air_quality",)
     assert coordinator.optional_endpoint_status["air_quality"] is False
@@ -79,4 +88,36 @@ async def test_optional_endpoint_recovery_clears_degraded_status() -> None:
 
     assert await coordinator._async_get_radar() is sentinel.radar
     assert coordinator.optional_endpoint_status["radar"] is True
+    assert coordinator.optional_api_degraded is False
+
+
+async def test_new_optional_endpoint_failure_isolated() -> None:
+    """Test a new intelligence endpoint can fail without affecting core data."""
+    client = _client()
+    client.async_get_meteorology.side_effect = WeatherPlatformConnectionError
+    coordinator = _coordinator(client)
+
+    data = await coordinator._async_update_data()
+
+    assert data.current is sentinel.current
+    assert data.forecast is sentinel.forecast
+    assert data.meteorology is None
+    assert coordinator.unavailable_optional_endpoints == ("meteorology",)
+
+
+async def test_unadvertised_optional_resource_is_skipped_without_degradation() -> None:
+    """Test backward compatibility with API versions lacking a new resource."""
+    client = _client()
+    coordinator = _coordinator(client)
+    coordinator.metadata = SimpleNamespace(
+        resources={
+            "current": "/api/v1/current",
+            "forecast": "/api/v1/forecast",
+            "alerts": "/api/v1/alerts",
+        }
+    )
+
+    assert await coordinator._async_get_meteorology() is None
+    client.async_get_meteorology.assert_not_awaited()
+    assert coordinator.optional_endpoint_status["meteorology"] is None
     assert coordinator.optional_api_degraded is False

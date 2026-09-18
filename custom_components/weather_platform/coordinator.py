@@ -23,23 +23,32 @@ if TYPE_CHECKING:
     from .api import (
         WeatherPlatformAirQualityData,
         WeatherPlatformAlertsData,
+        WeatherPlatformClimateData,
         WeatherPlatformCurrentData,
         WeatherPlatformEventsData,
         WeatherPlatformForecastData,
+        WeatherPlatformHydrologyData,
         WeatherPlatformImpactsData,
         WeatherPlatformMetadata,
+        WeatherPlatformMeteorologyData,
         WeatherPlatformRadarData,
+        WeatherPlatformTodayData,
     )
 
 _LOGGER = logging.getLogger(__name__)
 
-OPTIONAL_ENDPOINTS = (
-    "air_quality",
-    "alerts",
-    "radar",
-    "events",
-    "impacts",
-)
+OPTIONAL_RESOURCE_KEYS = {
+    "air_quality": "airQuality",
+    "alerts": "alerts",
+    "radar": "radar",
+    "events": "events",
+    "impacts": "impacts",
+    "today": "today",
+    "hydrology": "hydrology",
+    "climate": "climate",
+    "meteorology": "meteorology",
+}
+OPTIONAL_ENDPOINTS = tuple(OPTIONAL_RESOURCE_KEYS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +62,10 @@ class WeatherPlatformData:
     radar: WeatherPlatformRadarData | None
     events: WeatherPlatformEventsData | None
     impacts: WeatherPlatformImpactsData | None
+    today: WeatherPlatformTodayData | None = None
+    hydrology: WeatherPlatformHydrologyData | None = None
+    climate: WeatherPlatformClimateData | None = None
+    meteorology: WeatherPlatformMeteorologyData | None = None
 
 
 class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatformData]):
@@ -120,12 +133,26 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
         except WeatherPlatformApiError as err:
             raise UpdateFailed from err
 
-        air_quality, alerts, radar, events, impacts = await asyncio.gather(
+        (
+            air_quality,
+            alerts,
+            radar,
+            events,
+            impacts,
+            today,
+            hydrology,
+            climate,
+            meteorology,
+        ) = await asyncio.gather(
             self._async_get_air_quality(),
             self._async_get_alerts(),
             self._async_get_radar(),
             self._async_get_active_events(),
             self._async_get_impacts(),
+            self._async_get_today(),
+            self._async_get_hydrology(),
+            self._async_get_climate(),
+            self._async_get_meteorology(),
         )
 
         return WeatherPlatformData(
@@ -136,7 +163,24 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
             radar=radar,
             events=events,
             impacts=impacts,
+            today=today,
+            hydrology=hydrology,
+            climate=climate,
+            meteorology=meteorology,
         )
+
+    def _resource_advertised(self, endpoint: str) -> bool:
+        """Return whether the API index advertises an optional resource."""
+        metadata = getattr(self, "metadata", None)
+        if metadata is None:
+            return True
+
+        resource_key = OPTIONAL_RESOURCE_KEYS[endpoint]
+        if resource_key in metadata.resources:
+            return True
+
+        self._optional_endpoint_status[endpoint] = None
+        return False
 
     def _set_optional_endpoint_status(
         self,
@@ -164,6 +208,8 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
         self,
     ) -> WeatherPlatformAirQualityData | None:
         """Fetch optional air-quality guidance."""
+        if not self._resource_advertised("air_quality"):
+            return None
         try:
             result = await self.client.async_get_air_quality()
         except WeatherPlatformApiError:
@@ -179,6 +225,8 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
 
     async def _async_get_alerts(self) -> WeatherPlatformAlertsData | None:
         """Fetch optional active-alert intelligence."""
+        if not self._resource_advertised("alerts"):
+            return None
         try:
             result = await self.client.async_get_alerts()
         except WeatherPlatformApiError:
@@ -194,6 +242,8 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
 
     async def _async_get_radar(self) -> WeatherPlatformRadarData | None:
         """Fetch optional radar intelligence."""
+        if not self._resource_advertised("radar"):
+            return None
         try:
             result = await self.client.async_get_radar(self.unit_system)
         except WeatherPlatformApiError:
@@ -211,6 +261,8 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
         self,
     ) -> WeatherPlatformEventsData | None:
         """Fetch optional durable active weather events."""
+        if not self._resource_advertised("events"):
+            return None
         try:
             result = await self.client.async_get_active_events()
         except WeatherPlatformApiError:
@@ -226,6 +278,8 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
 
     async def _async_get_impacts(self) -> WeatherPlatformImpactsData | None:
         """Fetch optional weather-impact guidance."""
+        if not self._resource_advertised("impacts"):
+            return None
         try:
             result = await self.client.async_get_impacts(self.unit_system)
         except WeatherPlatformApiError:
@@ -237,4 +291,74 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
             return None
 
         self._set_optional_endpoint_status("impacts", available=True)
+        return result
+
+    async def _async_get_today(self) -> WeatherPlatformTodayData | None:
+        """Fetch optional synthesized daily weather story."""
+        if not self._resource_advertised("today"):
+            return None
+        try:
+            result = await self.client.async_get_today(self.unit_system)
+        except WeatherPlatformApiError:
+            self._set_optional_endpoint_status("today", available=False)
+            _LOGGER.debug(
+                "Weather Platform daily weather story is unavailable",
+                exc_info=True,
+            )
+            return None
+
+        self._set_optional_endpoint_status("today", available=True)
+        return result
+
+    async def _async_get_hydrology(self) -> WeatherPlatformHydrologyData | None:
+        """Fetch optional hydrology context."""
+        if not self._resource_advertised("hydrology"):
+            return None
+        try:
+            result = await self.client.async_get_hydrology(self.unit_system)
+        except WeatherPlatformApiError:
+            self._set_optional_endpoint_status("hydrology", available=False)
+            _LOGGER.debug(
+                "Weather Platform hydrology context is unavailable",
+                exc_info=True,
+            )
+            return None
+
+        self._set_optional_endpoint_status("hydrology", available=True)
+        return result
+
+    async def _async_get_climate(self) -> WeatherPlatformClimateData | None:
+        """Fetch optional climate context."""
+        if not self._resource_advertised("climate"):
+            return None
+        try:
+            result = await self.client.async_get_climate(self.unit_system)
+        except WeatherPlatformApiError:
+            self._set_optional_endpoint_status("climate", available=False)
+            _LOGGER.debug(
+                "Weather Platform climate context is unavailable",
+                exc_info=True,
+            )
+            return None
+
+        self._set_optional_endpoint_status("climate", available=True)
+        return result
+
+    async def _async_get_meteorology(
+        self,
+    ) -> WeatherPlatformMeteorologyData | None:
+        """Fetch optional meteorology intelligence."""
+        if not self._resource_advertised("meteorology"):
+            return None
+        try:
+            result = await self.client.async_get_meteorology(self.unit_system)
+        except WeatherPlatformApiError:
+            self._set_optional_endpoint_status("meteorology", available=False)
+            _LOGGER.debug(
+                "Weather Platform meteorology intelligence is unavailable",
+                exc_info=True,
+            )
+            return None
+
+        self._set_optional_endpoint_status("meteorology", available=True)
         return result

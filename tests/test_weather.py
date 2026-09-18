@@ -15,6 +15,7 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_SUNNY,
     ATTR_CONDITION_WINDY,
     ATTR_FORECAST_CONDITION,
+    ATTR_FORECAST_IS_DAYTIME,
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
     ATTR_FORECAST_NATIVE_WIND_GUST_SPEED,
@@ -28,6 +29,7 @@ from custom_components.weather_platform.api import (
     WeatherPlatformCurrentData,
     WeatherPlatformDailyForecast,
     WeatherPlatformForecastData,
+    WeatherPlatformForecastPeriod,
     WeatherPlatformHourlyForecast,
     WeatherPlatformStation,
     WeatherPlatformWind,
@@ -120,6 +122,23 @@ def test_weather_entity_exposes_current_conditions_and_forecasts() -> None:
                 wind_gust=12.0,
             ),
         ),
+        periods=(
+            WeatherPlatformForecastPeriod(
+                name="Tonight",
+                start_time="2026-09-18T22:00:00-04:00",
+                end_time="2026-09-19T06:00:00-04:00",
+                daytime=False,
+                temperature=63.0,
+                precipitation_probability=40,
+                short_forecast="Chance Showers",
+                detailed_forecast="A chance of showers overnight.",
+                wind=WeatherPlatformWind(
+                    minimum=3.0,
+                    maximum=7.0,
+                    direction="SW",
+                ),
+            ),
+        ),
     )
 
     entry = MagicMock()
@@ -147,6 +166,7 @@ def test_weather_entity_exposes_current_conditions_and_forecasts() -> None:
 
     daily = entity._async_forecast_daily()
     hourly = entity._async_forecast_hourly()
+    twice_daily = entity._async_forecast_twice_daily()
 
     assert len(daily) == 1
     assert daily[0][ATTR_FORECAST_CONDITION] == ATTR_CONDITION_PARTLYCLOUDY
@@ -160,3 +180,10 @@ def test_weather_entity_exposes_current_conditions_and_forecasts() -> None:
     assert hourly[0][ATTR_FORECAST_NATIVE_WIND_SPEED] == 7.0
     assert hourly[0][ATTR_FORECAST_WIND_BEARING] == "SW"
     assert hourly[0][ATTR_FORECAST_NATIVE_WIND_GUST_SPEED] == 12.0
+
+    assert len(twice_daily) == 1
+    assert twice_daily[0][ATTR_FORECAST_IS_DAYTIME] is False
+    assert twice_daily[0][ATTR_FORECAST_CONDITION] == ATTR_CONDITION_RAINY
+    assert twice_daily[0][ATTR_FORECAST_NATIVE_TEMP] == 63.0
+    assert twice_daily[0][ATTR_FORECAST_PRECIPITATION_PROBABILITY] == 40
+    assert twice_daily[0][ATTR_FORECAST_NATIVE_WIND_SPEED] == 7.0

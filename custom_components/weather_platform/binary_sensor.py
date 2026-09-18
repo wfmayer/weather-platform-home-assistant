@@ -50,6 +50,26 @@ async def async_setup_entry(
                 entry,
                 entry.runtime_data,
             ),
+            WeatherPlatformRadarPrecipitationNowBinarySensor(
+                entry,
+                entry.runtime_data,
+            ),
+            WeatherPlatformRadarDataStaleBinarySensor(
+                entry,
+                entry.runtime_data,
+            ),
+            WeatherPlatformRadarCoverageLimitedBinarySensor(
+                entry,
+                entry.runtime_data,
+            ),
+            WeatherPlatformHydrologyGaugeDataStaleBinarySensor(
+                entry,
+                entry.runtime_data,
+            ),
+            WeatherPlatformAtmosphericModelDataStaleBinarySensor(
+                entry,
+                entry.runtime_data,
+            ),
         ]
     )
 
@@ -219,3 +239,129 @@ class WeatherPlatformTrackedStormApproachingBinarySensor(WeatherPlatformBinarySe
         if radar is None or not radar.storm_tracking.available:
             return None
         return any(storm.approaching_home for storm in radar.storm_tracking.storms)
+
+
+class WeatherPlatformRadarPrecipitationNowBinarySensor(WeatherPlatformBinarySensor):
+    """Indicate whether radar nowcasting reports precipitation now."""
+
+    _attr_name = "Radar precipitation now"
+
+    def __init__(
+        self,
+        entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
+        coordinator: WeatherPlatformDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the radar precipitation binary sensor."""
+        super().__init__(entry, coordinator, "radar_precipitation_now")
+
+    @property
+    @override
+    def is_on(self) -> bool | None:
+        """Return whether radar reports precipitation now."""
+        radar = self.coordinator.data.radar
+        if radar is None or radar.nowcast is None or not radar.nowcast.available:
+            return None
+        return radar.nowcast.precipitation_now
+
+
+class WeatherPlatformRadarDataStaleBinarySensor(WeatherPlatformBinarySensor):
+    """Indicate whether radar precipitation data is stale."""
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_name = "Radar data stale"
+
+    def __init__(
+        self,
+        entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
+        coordinator: WeatherPlatformDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the radar data stale binary sensor."""
+        super().__init__(entry, coordinator, "radar_data_stale")
+
+    @property
+    @override
+    def is_on(self) -> bool | None:
+        """Return whether radar precipitation data is stale."""
+        radar = self.coordinator.data.radar
+        if radar is None or radar.precipitation is None:
+            return None
+        return radar.precipitation.stale
+
+
+class WeatherPlatformRadarCoverageLimitedBinarySensor(WeatherPlatformBinarySensor):
+    """Indicate whether the radar nowcast is coverage limited."""
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_name = "Radar coverage limited"
+
+    def __init__(
+        self,
+        entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
+        coordinator: WeatherPlatformDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the radar coverage binary sensor."""
+        super().__init__(entry, coordinator, "radar_coverage_limited")
+
+    @property
+    @override
+    def is_on(self) -> bool | None:
+        """Return whether the radar nowcast is coverage limited."""
+        radar = self.coordinator.data.radar
+        if radar is None or radar.nowcast is None or not radar.nowcast.available:
+            return None
+        return radar.nowcast.coverage_limited
+
+
+class WeatherPlatformHydrologyGaugeDataStaleBinarySensor(WeatherPlatformBinarySensor):
+    """Indicate whether nearby hydrology gauge data is stale."""
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_name = "Hydrology gauge data stale"
+
+    def __init__(
+        self,
+        entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
+        coordinator: WeatherPlatformDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the hydrology gauge stale binary sensor."""
+        super().__init__(entry, coordinator, "hydrology_gauge_data_stale")
+
+    @property
+    @override
+    def is_on(self) -> bool | None:
+        """Return whether nearby gauge data is stale."""
+        hydrology = self.coordinator.data.hydrology
+        if hydrology is None or not hydrology.gauges.available:
+            return None
+        return hydrology.gauges.stale
+
+
+class WeatherPlatformAtmosphericModelDataStaleBinarySensor(WeatherPlatformBinarySensor):
+    """Indicate whether atmospheric-model data is stale."""
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_name = "Atmospheric model data stale"
+
+    def __init__(
+        self,
+        entry: ConfigEntry[WeatherPlatformDataUpdateCoordinator],
+        coordinator: WeatherPlatformDataUpdateCoordinator,
+    ) -> None:
+        """Initialize the atmospheric-model stale binary sensor."""
+        super().__init__(entry, coordinator, "atmospheric_model_data_stale")
+
+    @property
+    @override
+    def is_on(self) -> bool | None:
+        """Return whether atmospheric-model data is stale."""
+        meteorology = self.coordinator.data.meteorology
+        if meteorology is None or meteorology.atmospheric_model is None:
+            return None
+        model = meteorology.atmospheric_model
+        if not model.available:
+            return None
+        return model.stale

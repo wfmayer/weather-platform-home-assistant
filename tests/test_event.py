@@ -7,7 +7,11 @@ from custom_components.weather_platform.api import (
     WeatherPlatformEvent,
     WeatherPlatformEventsData,
 )
-from custom_components.weather_platform.event import WeatherPlatformWeatherEventEntity
+from custom_components.weather_platform.event import (
+    WeatherPlatformWeatherEventEntity,
+    _event_attributes,
+    _event_key,
+)
 
 DETECTED_AT = "2026-09-18T21:00:00Z"
 
@@ -18,6 +22,7 @@ def _event(
     phase: str = "ACTIVE",
     priority: str = "NORMAL",
     detected_at: str = DETECTED_AT,
+    event_id: int | None = None,
 ) -> WeatherPlatformEvent:
     """Build a Weather Platform event for lifecycle tests."""
     return WeatherPlatformEvent(
@@ -29,6 +34,12 @@ def _event(
         priority_label=priority.title(),
         trigger_source="test",
         detected_at=detected_at,
+        event_id=event_id,
+        station_code="TEST123",
+        category="WEATHER",
+        state="ACTIVE",
+        state_label="Active",
+        last_evidence_at="2026-09-18T21:01:00Z",
     )
 
 
@@ -116,3 +127,22 @@ def test_endpoint_outage_resyncs_without_replay() -> None:
     coordinator.data = SimpleNamespace(events=_events(lightning, pressure, rain))
     entity._handle_coordinator_update()
     entity._emit_event.assert_called_once_with(rain, "started")
+
+
+def test_event_id_is_preferred_stable_identity() -> None:
+    """Test API event IDs are preferred over reconstructed event identity."""
+    event = _event(event_id=42)
+    assert _event_key(event) == 42
+
+
+def test_event_attributes_include_api_identity_and_context() -> None:
+    """Test emitted event attributes include stable API metadata."""
+    event = _event(event_id=42)
+
+    attributes = _event_attributes(event, "started", None)
+
+    assert attributes["event_id"] == 42
+    assert attributes["station_code"] == "TEST123"
+    assert attributes["category"] == "WEATHER"
+    assert attributes["state"] == "ACTIVE"
+    assert attributes["last_evidence_at"] == "2026-09-18T21:01:00Z"

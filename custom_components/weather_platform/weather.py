@@ -20,6 +20,7 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_WINDY,
     ATTR_CONDITION_WINDY_VARIANT,
     ATTR_FORECAST_CONDITION,
+    ATTR_FORECAST_IS_DAYTIME,
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
     ATTR_FORECAST_NATIVE_WIND_GUST_SPEED,
@@ -82,7 +83,9 @@ class WeatherPlatformWeatherEntity(
     _attr_has_entity_name = True
     _attr_name = None
     _attr_supported_features = (
-        WeatherEntityFeature.FORECAST_DAILY | WeatherEntityFeature.FORECAST_HOURLY
+        WeatherEntityFeature.FORECAST_DAILY
+        | WeatherEntityFeature.FORECAST_HOURLY
+        | WeatherEntityFeature.FORECAST_TWICE_DAILY
     )
 
     def __init__(
@@ -243,6 +246,40 @@ class WeatherPlatformWeatherEntity(
                     forecast[ATTR_FORECAST_WIND_BEARING] = item.wind.direction
             if item.wind_gust is not None:
                 forecast[ATTR_FORECAST_NATIVE_WIND_GUST_SPEED] = item.wind_gust
+
+            forecasts.append(forecast)
+
+        return forecasts
+
+    @callback
+    @override
+    def _async_forecast_twice_daily(self) -> list[Forecast]:
+        """Return NWS day and night forecast periods in native units."""
+        forecasts: list[Forecast] = []
+
+        for item in self.coordinator.data.forecast.periods:
+            forecast = Forecast(datetime=item.start_time)
+
+            condition = _forecast_condition(item.short_forecast)
+            if condition is not None:
+                forecast[ATTR_FORECAST_CONDITION] = condition
+            forecast[ATTR_FORECAST_IS_DAYTIME] = item.daytime
+            if item.temperature is not None:
+                forecast[ATTR_FORECAST_NATIVE_TEMP] = item.temperature
+            if item.precipitation_probability is not None:
+                forecast[ATTR_FORECAST_PRECIPITATION_PROBABILITY] = (
+                    item.precipitation_probability
+                )
+            if item.wind is not None:
+                wind_speed = (
+                    item.wind.maximum
+                    if item.wind.maximum is not None
+                    else item.wind.minimum
+                )
+                if wind_speed is not None:
+                    forecast[ATTR_FORECAST_NATIVE_WIND_SPEED] = wind_speed
+                if item.wind.direction is not None:
+                    forecast[ATTR_FORECAST_WIND_BEARING] = item.wind.direction
 
             forecasts.append(forecast)
 

@@ -33,7 +33,7 @@ WEATHER_EVENT_TYPES = [
     "other",
 ]
 
-type EventKey = tuple[str, str | None]
+type EventKey = int | tuple[str, str | None]
 
 
 async def async_setup_entry(
@@ -166,6 +166,8 @@ class WeatherPlatformWeatherEventEntity(
 
 def _event_key(event: WeatherPlatformEvent) -> EventKey:
     """Return the stable identity for one active Weather Platform event."""
+    if event.event_id is not None:
+        return event.event_id
     return event.event_type, event.detected_at
 
 
@@ -173,21 +175,28 @@ def _event_attributes(
     event: WeatherPlatformEvent,
     change: str,
     previous: WeatherPlatformEvent | None,
-) -> dict[str, str]:
+) -> dict[str, str | int]:
     """Build native Home Assistant event attributes."""
-    attributes = {
+    attributes: dict[str, str | int] = {
         "change": change,
         "weather_platform_type": event.event_type,
         "priority": event.priority,
     }
 
-    optional_attributes = {
+    optional_attributes: dict[str, str | int | None] = {
+        "event_id": event.event_id,
+        "station_code": event.station_code,
         "type_label": event.type_label,
+        "category": event.category,
+        "state": event.state,
+        "state_label": event.state_label,
         "phase": event.phase,
         "phase_label": event.phase_label,
         "priority_label": event.priority_label,
         "trigger_source": event.trigger_source,
         "detected_at": event.detected_at,
+        "last_evidence_at": event.last_evidence_at,
+        "resolved_at": event.resolved_at,
     }
     attributes.update(
         {key: value for key, value in optional_attributes.items() if value is not None}

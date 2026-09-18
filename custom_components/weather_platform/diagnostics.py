@@ -40,6 +40,10 @@ async def async_get_config_entry_diagnostics(
     radar = data.radar
     events = data.events
     impacts = data.impacts
+    today = data.today
+    hydrology = data.hydrology
+    climate = data.climate
+    meteorology = data.meteorology
 
     return {
         "config_entry": {
@@ -77,6 +81,7 @@ async def async_get_config_entry_diagnostics(
             "generated_at": data.forecast.generated_at,
             "periods_available": data.forecast.periods_available,
             "hourly_available": data.forecast.hourly_available,
+            "twice_daily_period_count": len(data.forecast.periods),
             "daily_period_count": len(data.forecast.daily),
             "hourly_period_count": len(data.forecast.hourly),
         },
@@ -88,6 +93,14 @@ async def async_get_config_entry_diagnostics(
             "provider": air_quality.provider if air_quality is not None else None,
             "model": air_quality.model if air_quality is not None else None,
             "stale": air_quality.stale if air_quality is not None else None,
+            "hourly_period_count": (
+                len(air_quality.hourly) if air_quality is not None else 0
+            ),
+            "dominant_pollutant": (
+                air_quality.current.dominant_pollutant
+                if air_quality is not None
+                else None
+            ),
         },
         "alerts": {
             "endpoint_available": alerts is not None,
@@ -97,6 +110,31 @@ async def async_get_config_entry_diagnostics(
         },
         "radar": {
             "endpoint_available": radar is not None,
+            "precipitation_available": (
+                radar.precipitation.available
+                if radar is not None and radar.precipitation is not None
+                else None
+            ),
+            "precipitation_stale": (
+                radar.precipitation.stale
+                if radar is not None and radar.precipitation is not None
+                else None
+            ),
+            "nowcast_available": (
+                radar.nowcast.available
+                if radar is not None and radar.nowcast is not None
+                else None
+            ),
+            "precipitation_now": (
+                radar.nowcast.precipitation_now
+                if radar is not None and radar.nowcast is not None
+                else None
+            ),
+            "nowcast_status": (
+                radar.nowcast.status
+                if radar is not None and radar.nowcast is not None
+                else None
+            ),
             "lightning_available": (
                 radar.lightning.available if radar is not None else None
             ),
@@ -125,6 +163,15 @@ async def async_get_config_entry_diagnostics(
                 if events is not None
                 else []
             ),
+            "active_ids": (
+                sorted(
+                    event.event_id
+                    for event in events.events
+                    if event.event_id is not None
+                )
+                if events is not None
+                else []
+            ),
         },
         "impacts": {
             "endpoint_available": impacts is not None,
@@ -136,6 +183,84 @@ async def async_get_config_entry_diagnostics(
                 {profile.key: profile.current_rating for profile in impacts.profiles}
                 if impacts is not None
                 else {}
+            ),
+            "profiles_with_best_window": (
+                sorted(
+                    profile.key
+                    for profile in impacts.profiles
+                    if profile.best_window is not None
+                )
+                if impacts is not None
+                else []
+            ),
+        },
+        "today": {
+            "endpoint_available": today is not None,
+            "generated_at": today.generated_at if today is not None else None,
+            "section_count": len(today.sections) if today is not None else 0,
+            "has_best_window": (
+                today.best_window is not None if today is not None else None
+            ),
+            "has_impact_window": (
+                today.impact_window is not None if today is not None else None
+            ),
+        },
+        "hydrology": {
+            "endpoint_available": hydrology is not None,
+            "rainfall_available": (
+                hydrology.rainfall.available if hydrology is not None else None
+            ),
+            "rainfall_level": (
+                hydrology.rainfall.level if hydrology is not None else None
+            ),
+            "gauge_data_available": (
+                hydrology.gauges.available if hydrology is not None else None
+            ),
+            "gauge_data_stale": (
+                hydrology.gauges.stale if hydrology is not None else None
+            ),
+            "gauge_count": (
+                len(hydrology.gauges.gauges) if hydrology is not None else 0
+            ),
+            "rising_gauge_count": (
+                hydrology.gauges.rising_count if hydrology is not None else None
+            ),
+        },
+        "climate": {
+            "endpoint_available": climate is not None,
+            "available": climate.available if climate is not None else None,
+            "complete_day_count": (
+                climate.complete_day_count if climate is not None else None
+            ),
+            "archive_year_count": (
+                climate.archive_year_count if climate is not None else None
+            ),
+            "latest_complete_date": (
+                climate.latest_day.date if climate is not None else None
+            ),
+        },
+        "meteorology": {
+            "endpoint_available": meteorology is not None,
+            "available": meteorology.available if meteorology is not None else None,
+            "wbgt_available": (
+                meteorology.wbgt.available
+                if meteorology is not None and meteorology.wbgt is not None
+                else None
+            ),
+            "atmospheric_model_available": (
+                meteorology.atmospheric_model.available
+                if meteorology is not None and meteorology.atmospheric_model is not None
+                else None
+            ),
+            "atmospheric_model_stale": (
+                meteorology.atmospheric_model.stale
+                if meteorology is not None and meteorology.atmospheric_model is not None
+                else None
+            ),
+            "severe_weather_available": (
+                meteorology.severe_weather.available
+                if meteorology is not None and meteorology.severe_weather is not None
+                else None
             ),
         },
     }
