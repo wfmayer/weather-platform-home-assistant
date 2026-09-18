@@ -1,5 +1,7 @@
 # Weather Platform Home Assistant
 
+![Weather Platform icon](custom_components/weather_platform/brand/icon.png)
+
 Native Home Assistant custom integration for Weather Platform.
 
 Weather Platform remains the authoritative weather backend. This integration
@@ -45,20 +47,49 @@ adds the API path itself.
 
 ## Installation
 
-### Manual installation
+### HACS
 
-HACS packaging is not yet included. For the current development version:
+The repository is HACS-ready, but HACS requires repositories to be public.
+While this repository remains private, use the manual installation method
+below.
 
-1. Copy `custom_components/weather_platform` into the Home Assistant
-   `custom_components` directory.
-2. Restart Home Assistant.
-3. Open **Settings > Devices & services**.
-4. Choose **Add Integration**.
-5. Search for **Weather Platform**.
-6. Enter the base URL of the Weather Platform instance.
+When the repository is public:
+
+1. Open HACS in Home Assistant.
+2. Open the HACS menu and choose **Custom repositories**.
+3. Add `https://github.com/wfmayer/weather-platform-home-assistant`.
+4. Select **Integration** as the repository type.
+5. Install **Weather Platform**.
+6. Restart Home Assistant if requested.
+7. Open **Settings > Devices & services** and add **Weather Platform**.
+
+Published GitHub releases are exposed to HACS as selectable versions. The
+integration declares Home Assistant 2026.9.2 as its minimum supported version
+in `hacs.json`.
+
+### Manual installation from a release
+
+Each tagged release publishes `weather-platform-home-assistant.zip`. The archive
+contains the `custom_components/weather_platform` path, so it can be extracted
+directly into the Home Assistant configuration directory.
+
+1. Download the ZIP from the GitHub release.
+2. Extract it into the Home Assistant configuration directory.
+3. Confirm that `custom_components/weather_platform/manifest.json` exists.
+4. Restart Home Assistant.
+5. Open **Settings > Devices & services**.
+6. Choose **Add Integration**.
+7. Search for **Weather Platform**.
+8. Enter the base URL of the Weather Platform instance.
 
 The config flow validates that the server identifies itself as the supported
 Weather Platform v1 API before creating the entry.
+
+### Manual installation from source
+
+For development builds, copy `custom_components/weather_platform` from the
+repository into the Home Assistant `custom_components` directory and restart
+Home Assistant.
 
 ## How it works
 
@@ -265,13 +296,46 @@ pytest Home Assistant custom-component test suite.
 GitHub Actions runs both commands automatically for pushes to `main` and pull
 requests targeting `main`.
 
+A separate validation workflow runs both hassfest and the HACS repository
+validator. The HACS topics check is temporarily ignored while the repository is
+private and has no GitHub topics configured. Remove that ignore after adding
+repository topics for public distribution.
+
+## Releases
+
+The integration version is defined in
+`custom_components/weather_platform/manifest.json`.
+
+To publish a release:
+
+1. Update the manifest version and changelog.
+2. Commit and push the release changes.
+3. Create a matching `v`-prefixed tag.
+4. Push the tag.
+
+For example, for manifest version `0.1.0`:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow verifies that the tag matches the manifest version, runs
+lint and tests, creates the manual-install ZIP, and publishes the GitHub release
+with generated release notes.
+
 ## Repository layout
 
 ```text
 custom_components/weather_platform/  Home Assistant integration
+custom_components/weather_platform/brand/  Local Home Assistant brand assets
 scripts/                             Development, lint, and test helpers
 tests/                               Automated integration tests
 .github/workflows/ci.yml             GitHub Actions quality checks
+.github/workflows/validate.yml       HACS and hassfest validation
+.github/workflows/release.yml        Tagged release publishing
+hacs.json                            HACS repository metadata
+CHANGELOG.md                         Release history
 ```
 
 ## Integration domain
