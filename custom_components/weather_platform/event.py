@@ -85,7 +85,7 @@ class WeatherPlatformWeatherEventEntity(
             manufacturer=NAME,
             model="REST API",
             sw_version=platform_version,
-            configuration_url=coordinator.client.base_url,
+            configuration_url=f"{coordinator.client.base_url}/current",
             entry_type=DeviceEntryType.SERVICE,
         )
 
