@@ -1,4 +1,6 @@
 {
+  "domain": "weather_platform",
+  "name": "Weather Platform",
   "codeowners": [
     "@wfmayer"
   ],
@@ -7,10 +9,8 @@
     "webhook"
   ],
   "documentation": "https://github.com/wfmayer/weather-platform-home-assistant",
-  "domain": "weather_platform",
   "integration_type": "hub",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/wfmayer/weather-platform-home-assistant/issues",
-  "name": "Weather Platform",
   "version": "0.3.0"
 }
