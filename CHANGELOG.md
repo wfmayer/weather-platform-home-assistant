@@ -9,9 +9,9 @@ All notable changes to the Weather Platform Home Assistant integration are docum
 - Options flow for integration-managed realtime delivery, a shared registration token, and the HA callback origin.
 - Stable webhook/client identity and authenticated registration using the matching platform subscription API.
 - Schema-v1 webhook validation, persistent bounded delivery deduplication, and coordinator refresh after accepted transitions.
-- Native `weather_platform_event` bus events and device triggers filtered by lifecycle and event family.
+- Native `weather_platform_event` bus events and device triggers filtered by lifecycle and event family, including operational station/provider health events.
 - Registration diagnostics and redaction of webhook and registration credentials.
-- Deployment instructions and tests for registration, retry handling, options, lifecycle, and trigger filtering.
+- Realtime deployment, callback-network troubleshooting, automation, and end-to-end test guide, plus tests for registration, retry handling, options, lifecycle, and trigger filtering.
 
 ### Changed
 

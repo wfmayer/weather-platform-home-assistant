@@ -4,7 +4,7 @@
 
 Native Home Assistant custom integration for Weather Platform.
 
-Weather Platform remains the authoritative weather backend. This integration polls its versioned REST API and exposes the data that is useful for Home Assistant dashboards, automations, diagnostics, and native weather/event features.
+Weather Platform remains the authoritative weather backend. This integration polls its versioned REST API for weather and diagnostic state. Optionally, Weather Platform can push durable event transitions to an integration-owned Home Assistant webhook for native events, device triggers, and faster refreshes.
 
 ## Status
 
@@ -26,7 +26,8 @@ Current capabilities include:
 - Hydrology and antecedent-rainfall context
 - Synthesized Today weather story
 - Climate context and recent departures
-- Durable Weather Platform event lifecycle updates
+- Durable Weather Platform weather and operational event lifecycle updates
+- Optional integration-managed realtime webhooks, native event-bus events, and device triggers
 - Weather-impact guidance
 - Diagnostic entities and downloadable Home Assistant diagnostics
 - Graceful degradation when optional Weather Platform API resources are unavailable
@@ -35,13 +36,9 @@ Current capabilities include:
 
 You need a reachable Weather Platform instance with the v1 REST API enabled. Home Assistant must be able to connect to the Weather Platform application base URL directly.
 
-For example:
+For example, use `http://192.168.1.50:8080` when Weather Platform is deployed at the server root, or `http://192.168.1.50:8080/weather-platform` when the development WAR is deployed with the `/weather-platform` context path.
 
-```text
-http://192.168.1.50:8080
-```
-
-Enter the application base URL only. Do not append `/api/v1`; the integration adds the API path itself.
+Enter the application base URL including its context path, if any. Do not append `/api/v1`; the integration adds the API path itself. An HA development container must be able to reach this URL from *inside* the container.
 
 ## Installation
 
@@ -302,9 +299,9 @@ The integration exposes:
 
 ## Native weather events
 
-Weather Platform durable weather events are exposed through the native **Weather events** event entity.
+Weather Platform durable event transitions are exposed through the native **Weather events** event entity.
 
-Known Weather Platform weather-event types are emitted as Home Assistant event types, including rain, NWS alerts, lightning, wind, heavy rain, heat stress, frost or freeze, pressure fall, air quality, hydrology, and radar storm events. Unknown future Weather Platform weather-event types fall back to `other`.
+Known Weather Platform event types include rain, NWS alerts, lightning, wind, heavy rain, heat stress, frost or freeze, pressure fall, air quality, hydrology, radar storm, station data health, and provider data health. Unknown future event types fall back to `other`. The **Active Weather Platform events** sensor is based on the polled WEATHER-category events endpoint; operational station/provider health transitions can therefore arrive at the event entity without increasing that sensor.
 
 Each event includes lifecycle context in its attributes. The `change` attribute is one of:
 
@@ -320,22 +317,26 @@ infer lifecycle changes and resynchronizes silently after an events-endpoint out
 
 ### Integration-managed realtime delivery
 
-Version 0.3.0 adds an opt-in official delivery path from Weather Platform to HA.
-Open the integration's **Configure** dialog to enable it with the shared platform
-registration token and the platform-reachable HA callback origin. The integration
-creates and registers its own webhook; no manually managed webhook automation is
-needed. Existing entity IDs and normal 60-second weather polling are preserved.
+Version 0.3.0 adds opt-in integration-managed realtime delivery. Deploy the matching
+Weather Platform update first; its API index must advertise
+`homeAssistantSubscriptions`. Configure the shared platform registration token and
+Home Assistant callback origin under **Settings > Devices & services > Weather Platform > Configure**.
+The origin is the HA address *as reached from Weather Platform*, without any path;
+it must exactly match an entry in the platform webhook-origin allowlist. The
+integration creates and registers its own webhook. No manually managed webhook
+automation, webhook ID, or HA long-lived access token is needed.
 
 Accepted platform transitions update the **Weather events** entity, fire the
 `weather_platform_event` bus event, expose device triggers, and request a prompt
-coordinator refresh. In this mode polling does not emit duplicate lifecycle events
-or bypass platform notification preferences. Title/message, stable identities,
-lifecycle, priority, and family-specific details are available to HA automations.
-Phone notifications, TTS, and other actions remain in your automations.
+coordinator refresh. Ordinary 60-second weather polling and existing entity IDs
+remain in place; while realtime is enabled, polling does **not** synthesize
+fallback lifecycle events if registration fails. The platform's notification
+preferences may suppress outbound transitions without removing them from its
+event history. Phone notifications, TTS, and other actions remain in your automations.
 
-See [Realtime deployment and testing](docs/realtime-event-delivery.md) for the
-matching platform migration, setup order, notification example, receiver lifecycle,
-retry behavior, and limitations. Apply the platform update before enabling realtime.
+See [Realtime setup, automation, troubleshooting, and testing](docs/realtime-event-delivery.md)
+for deployment order, callback-network requirements, lifecycle/retry behavior,
+and a manual test using the station-data-health event detector.
 
 ## Diagnostics and resilience
 
@@ -406,11 +407,11 @@ To publish a release:
 3. Create a matching `v`-prefixed tag.
 4. Push the tag.
 
-For example, for manifest version `0.2.0`:
+For example, for manifest version `0.3.0`:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 The release workflow verifies that the tag matches the manifest version, runs lint and tests, creates the manual-install ZIP, and publishes the GitHub release with generated release notes.
@@ -427,6 +428,7 @@ tests/                               Automated integration tests
 .github/workflows/release.yml        Tagged release publishing
 hacs.json                            HACS repository metadata
 CHANGELOG.md                         Release history
+docs/realtime-event-delivery.md       Realtime setup, automation, and testing
 ```
 
 ## Integration domain
