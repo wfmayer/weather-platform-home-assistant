@@ -34,6 +34,7 @@ if TYPE_CHECKING:
         WeatherPlatformRadarData,
         WeatherPlatformTodayData,
     )
+    from .realtime import WeatherPlatformRealtime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,6 +80,7 @@ class WeatherPlatformDataUpdateCoordinator(DataUpdateCoordinator[WeatherPlatform
         unit_system: str,
     ) -> None:
         """Initialize the Weather Platform coordinator."""
+        self.realtime: WeatherPlatformRealtime | None = None
         self.client = client
         self.unit_system = unit_system
         self.metadata: WeatherPlatformMetadata | None = None

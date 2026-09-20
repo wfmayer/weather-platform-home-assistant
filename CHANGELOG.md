@@ -2,6 +2,23 @@
 
 All notable changes to the Weather Platform Home Assistant integration are documented here.
 
+## 0.3.0 - 2026-09-19
+
+### Added
+
+- Options flow for integration-managed realtime delivery, a shared registration token, and the HA callback origin.
+- Stable webhook/client identity and authenticated registration using the matching platform subscription API.
+- Schema-v1 webhook validation, persistent bounded delivery deduplication, and coordinator refresh after accepted transitions.
+- Native `weather_platform_event` bus events and device triggers filtered by lifecycle and event family.
+- Registration diagnostics and redaction of webhook and registration credentials.
+- Deployment instructions and tests for registration, retry handling, options, lifecycle, and trigger filtering.
+
+### Changed
+
+- The existing Weather events entity consumes accepted deliveries when realtime is enabled, avoiding duplicate polling notifications and respecting platform notification preferences.
+- Normal reloads retain platform subscriptions and provide a local retry receiver; explicit disable/removal deactivates the subscription.
+- Realtime registration failure leaves ordinary weather polling available and retries registration without changing client identity.
+
 ## 0.2.0 - 2026-09-18
 
 Expanded the integration to expose the Weather Platform API data that is useful in Home Assistant while intentionally leaving application-oriented and historical API resources out of the polling path.

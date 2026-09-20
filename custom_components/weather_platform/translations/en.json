@@ -21,5 +21,59 @@
     "abort": {
       "already_configured": "This Weather Platform instance is already configured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Realtime event delivery",
+        "description": "Enable after deploying the matching Weather Platform update. Use the shared platform registration token and an HA address reachable from the platform. Saving reloads the integration. Disabling deactivates the platform subscription.",
+        "data": {
+          "realtime_enabled": "Enable realtime event delivery",
+          "integration_token": "Platform integration token",
+          "callback_url": "Home Assistant callback origin"
+        },
+        "data_description": {
+          "integration_token": "Leave blank to keep the saved token. This is not an HA access token.",
+          "callback_url": "Example: http://192.168.1.20:8123. Must match the platform webhook-origin allowlist."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to Weather Platform.",
+      "invalid_response": "The server responded, but it does not appear to be a supported Weather Platform API.",
+      "invalid_url": "Enter a valid http or https URL without a query string or fragment.",
+      "unknown": "An unexpected error occurred.",
+      "invalid_auth": "Enter the platform integration token (at least 32 characters). Leave blank to keep the saved token.",
+      "invalid_callback_url": "Enter the Home Assistant origin, such as http://192.168.1.20:8123, without a path.",
+      "unsupported_realtime": "Update Weather Platform to a version that supports integration-managed event subscriptions.",
+      "subscription_conflict": "This station is already owned by another integration client. Resolve the existing subscription on Weather Platform.",
+      "invalid_subscription": "The platform rejected registration. Check the station and allowed webhook origins.",
+      "registration_unavailable": "Registration is unavailable. Check platform configuration, routing, and server availability."
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "weather_event": "Weather event received",
+      "started": "Weather event started",
+      "updated": "Weather event updated",
+      "ended": "Weather event ended"
+    },
+    "trigger_subtype": {
+      "any": "Any event type",
+      "rain": "Rain",
+      "nws_alert": "Nws Alert",
+      "lightning": "Lightning",
+      "wind": "Wind",
+      "heavy_rain": "Heavy Rain",
+      "heat_stress": "Heat Stress",
+      "frost_freeze": "Frost Freeze",
+      "pressure_fall": "Pressure Fall",
+      "air_quality": "Air Quality",
+      "hydrology": "Hydrology",
+      "radar_storm": "Radar Storm",
+      "station_data_health": "Station Data Health",
+      "provider_data_health": "Provider Data Health",
+      "other": "Other"
+    }
   }
 }

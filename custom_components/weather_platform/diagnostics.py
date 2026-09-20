@@ -8,13 +8,15 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.const import CONF_URL
 
+from .const import CONF_CALLBACK_URL, CONF_INTEGRATION_TOKEN, CONF_WEBHOOK_ID
+
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
     from .coordinator import WeatherPlatformDataUpdateCoordinator
 
-TO_REDACT = {CONF_URL}
+TO_REDACT = {CONF_URL, CONF_INTEGRATION_TOKEN, CONF_CALLBACK_URL, CONF_WEBHOOK_ID}
 
 
 async def async_get_config_entry_diagnostics(
@@ -49,6 +51,7 @@ async def async_get_config_entry_diagnostics(
         "config_entry": {
             "title": entry.title,
             "data": async_redact_data(dict(entry.data), TO_REDACT),
+            "options": async_redact_data(dict(entry.options), TO_REDACT),
             "version": entry.version,
             "minor_version": entry.minor_version,
         },
@@ -61,6 +64,17 @@ async def async_get_config_entry_diagnostics(
             "advertised_resources": (
                 sorted(metadata.resources) if metadata is not None else []
             ),
+        },
+        "realtime": {
+            "status": coordinator.realtime.status
+            if coordinator.realtime
+            else "disabled",
+            "last_error": coordinator.realtime.last_error
+            if coordinator.realtime
+            else None,
+            "last_received": coordinator.realtime.last_received
+            if coordinator.realtime
+            else None,
         },
         "coordinator": {
             "last_update_success": coordinator.last_update_success,

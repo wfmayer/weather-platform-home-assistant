@@ -314,13 +314,34 @@ Each event includes lifecycle context in its attributes. The `change` attribute 
 
 Where available, native event payloads also include the stable Weather Platform event ID, station code, category, lifecycle state, phase, priority, trigger source, detection time, and latest evidence time.
 
-Events that were already active when Home Assistant starts are used to seed the integration state and are not replayed as new events. If the optional events endpoint temporarily becomes unavailable, the integration resynchronizes when it returns instead of generating synthetic lifecycle changes for the outage.
+Events that were already active when Home Assistant starts seed coordinator state
+without generating startup alerts. Without realtime enabled, polling continues to
+infer lifecycle changes and resynchronizes silently after an events-endpoint outage.
+
+### Integration-managed realtime delivery
+
+Version 0.3.0 adds an opt-in official delivery path from Weather Platform to HA.
+Open the integration's **Configure** dialog to enable it with the shared platform
+registration token and the platform-reachable HA callback origin. The integration
+creates and registers its own webhook; no manually managed webhook automation is
+needed. Existing entity IDs and normal 60-second weather polling are preserved.
+
+Accepted platform transitions update the **Weather events** entity, fire the
+`weather_platform_event` bus event, expose device triggers, and request a prompt
+coordinator refresh. In this mode polling does not emit duplicate lifecycle events
+or bypass platform notification preferences. Title/message, stable identities,
+lifecycle, priority, and family-specific details are available to HA automations.
+Phone notifications, TTS, and other actions remain in your automations.
+
+See [Realtime deployment and testing](docs/realtime-event-delivery.md) for the
+matching platform migration, setup order, notification example, receiver lifecycle,
+retry behavior, and limitations. Apply the platform update before enabling realtime.
 
 ## Diagnostics and resilience
 
 Home Assistant diagnostics are supported for the config entry. The diagnostics payload includes API/platform version information, endpoint health, data freshness, forecast counts, radar/nowcast status, event IDs and types, impact-profile state, Today availability, hydrology health, climate coverage, and meteorology/model health.
 
-The configured Weather Platform URL is redacted from the downloadable diagnostics payload.
+The configured Weather Platform URL, registration token, callback origin, and webhook ID are redacted from diagnostics. Realtime registration status, safe error codes, and the last received transition timestamp are included.
 
 For quick health checks, inspect the diagnostic entities:
 

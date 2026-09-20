@@ -5,33 +5,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, override
 
 from homeassistant.components.event import EventEntity
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, NAME
+from .const import CONF_REALTIME_ENABLED, DOMAIN, EVENT_WEATHER_PLATFORM, NAME
 from .coordinator import WeatherPlatformDataUpdateCoordinator
+from .event_delivery import WEATHER_EVENT_TYPES
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
+    from homeassistant.core import Event, HomeAssistant
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
     from .api import WeatherPlatformEvent
-
-WEATHER_EVENT_TYPES = [
-    "rain",
-    "nws_alert",
-    "lightning",
-    "wind",
-    "heavy_rain",
-    "heat_stress",
-    "frost_freeze",
-    "pressure_fall",
-    "air_quality",
-    "hydrology",
-    "radar_storm",
-    "other",
-]
 
 type EventKey = int | tuple[str, str | None]
 
@@ -71,6 +60,8 @@ class WeatherPlatformWeatherEventEntity(
         """Initialize the Weather Platform event entity."""
         super().__init__(coordinator)
 
+        self._entry_id = entry.entry_id
+        self._realtime_enabled = entry.options.get(CONF_REALTIME_ENABLED, False) is True
         identifier = entry.unique_id or entry.entry_id
         self._attr_unique_id = f"{identifier}:weather_events"
 
@@ -101,11 +92,37 @@ class WeatherPlatformWeatherEventEntity(
     @override
     def available(self) -> bool:
         """Return whether Weather Platform weather events are available."""
+        if self._realtime_enabled:
+            return self.coordinator.realtime is not None
         return super().available and self.coordinator.data.events is not None
+
+    @override
+    async def async_added_to_hass(self) -> None:
+        """Listen for accepted transitions when realtime delivery is configured."""
+        await super().async_added_to_hass()
+        if self._realtime_enabled:
+            self.async_on_remove(
+                self.hass.bus.async_listen(
+                    EVENT_WEATHER_PLATFORM, self._handle_delivery
+                )
+            )
+
+    @callback
+    def _handle_delivery(self, event: Event[dict[str, Any]]) -> None:
+        """Project this entry's accepted transition onto the native event entity."""
+        if event.data.get("config_entry_id") != self._entry_id:
+            return
+        attributes = dict(event.data)
+        event_type = attributes.pop("event_type")
+        self._trigger_event(event_type, attributes)
+        self.async_write_ha_state()
 
     @override
     def _handle_coordinator_update(self) -> None:
         """Emit new Weather Platform event lifecycle changes."""
+        if self._realtime_enabled:
+            super()._handle_coordinator_update()
+            return
         events = self.coordinator.data.events
 
         if not self.coordinator.last_update_success or events is None:
